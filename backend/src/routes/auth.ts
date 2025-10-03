@@ -12,6 +12,14 @@ const router = Router();
 // @access  Public
 router.post('/register', validate(registerSchema), async (req: Request, res: Response) => {
   try {
+    console.log('=== REGISTERATION DEBUG ===');
+    console.log('Request body:', req.body);
+    console.log('Environment variables check:');
+    console.log('- JWT_SECRET exists:', !!process.env.JWT_SECRET);
+    console.log('- JWT_REFRESH_SECRET exists:', !!process.env.JWT_REFRESH_SECRET);
+    console.log('- MONGODB_URI exists:', !!process.env.MONGODB_URI);
+    console.log('=========================');
+    
     const { name, mobile, email, password } = req.body;
 
     // Check if user already exists
@@ -40,8 +48,10 @@ router.post('/register', validate(registerSchema), async (req: Request, res: Res
     await user.save();
 
     // Generate tokens
+    console.log('Generating tokens for user:', user._id.toString(), user.mobile);
     const token = generateToken(user._id.toString(), user.mobile);
     const refreshToken = generateRefreshToken(user._id.toString());
+    console.log('Tokens generated successfully');
 
     // Add refresh token to user
     user.refreshTokens.push(refreshToken);
@@ -71,8 +81,12 @@ router.post('/register', validate(registerSchema), async (req: Request, res: Res
         token,
       },
     });
-  } catch (error) {
-    console.error('Registration error:', error);
+  } catch (error: any) {
+    console.error('=== REGISTRATION ERROR ===');
+    console.error('Error details:', error);
+    console.error('Error message:', error.message);
+    console.error('Error stack:', error.stack);
+    console.error('========================');
     res.status(500).json({
       success: false,
       message: 'Server error during registration',
