@@ -23,7 +23,7 @@
     "joi": "^17.11.0",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.0.3",
-    "razorpay": "^2.9.6"
+    "sonner": "^2.0.3"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",

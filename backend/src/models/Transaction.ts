@@ -3,23 +3,12 @@ import mongoose, { Document, Schema } from 'mongoose';
 export interface ITransaction extends Document {
   _id: mongoose.Types.ObjectId;
   userId: mongoose.Types.ObjectId;
-  razorpayPaymentId: string;
-  razorpayOrderId: string;
-  razorpaySignature: string;
   amount: number;
-  currency: string;
-  status: 'pending' | 'completed' | 'failed' | 'cancelled';
   description: string;
   category: string;
-  merchant: string;
-  paymentMethod: string;
-  metadata: {
-    upiId?: string;
-    bankName?: string;
-    cardLast4?: string;
-    cardType?: string;
-    walletName?: string;
-  };
+  merchant?: string;
+  paymentMethod?: string;
+  notes?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -31,7 +20,6 @@ export interface ITransactionModel extends mongoose.Model<ITransaction> {
     limit?: number,
     filters?: {
       category?: string;
-      status?: string;
       paymentMethod?: string;
       startDate?: Date;
       endDate?: Date;
@@ -70,38 +58,10 @@ const transactionSchema = new Schema<ITransaction>({
     required: true,
     index: true
   },
-  razorpayPaymentId: {
-    type: String,
-    required: true,
-    unique: true,
-    index: true
-  },
-  razorpayOrderId: {
-    type: String,
-    required: true,
-    index: true
-  },
-  razorpaySignature: {
-    type: String,
-    required: true
-  },
   amount: {
     type: Number,
     required: true,
     min: [0, 'Amount cannot be negative']
-  },
-  currency: {
-    type: String,
-    required: true,
-    default: 'INR',
-    enum: ['INR']
-  },
-  status: {
-    type: String,
-    required: true,
-    enum: ['pending', 'completed', 'failed', 'cancelled'],
-    default: 'pending',
-    index: true
   },
   description: {
     type: String,
@@ -121,22 +81,18 @@ const transactionSchema = new Schema<ITransaction>({
   },
   merchant: {
     type: String,
-    required: true,
     trim: true,
     maxlength: [100, 'Merchant name cannot exceed 100 characters']
   },
   paymentMethod: {
     type: String,
-    required: true,
-    enum: ['upi', 'card', 'netbanking', 'wallet', 'emi'],
+    enum: ['cash', 'upi', 'card', 'netbanking', 'wallet', 'other'],
     index: true
   },
-  metadata: {
-    upiId: { type: String },
-    bankName: { type: String },
-    cardLast4: { type: String },
-    cardType: { type: String },
-    walletName: { type: String }
+  notes: {
+    type: String,
+    trim: true,
+    maxlength: [200, 'Notes cannot exceed 200 characters']
   }
 }, {
   timestamps: true,
@@ -151,7 +107,6 @@ const transactionSchema = new Schema<ITransaction>({
 // Indexes for better query performance
 transactionSchema.index({ userId: 1, createdAt: -1 });
 transactionSchema.index({ userId: 1, category: 1 });
-transactionSchema.index({ userId: 1, status: 1 });
 transactionSchema.index({ createdAt: -1 });
 
 // Virtual for formatted amount
@@ -166,7 +121,6 @@ transactionSchema.statics.getUserTransactions = async function(
   limit: number = 20,
   filters: {
     category?: string;
-    status?: string;
     paymentMethod?: string;
     startDate?: Date;
     endDate?: Date;
@@ -175,7 +129,6 @@ transactionSchema.statics.getUserTransactions = async function(
   const query: any = { userId: new mongoose.Types.ObjectId(userId) };
   
   if (filters.category) query.category = filters.category;
-  if (filters.status) query.status = filters.status;
   if (filters.paymentMethod) query.paymentMethod = filters.paymentMethod;
   if (filters.startDate || filters.endDate) {
     query.createdAt = {};
@@ -224,7 +177,6 @@ transactionSchema.statics.getSpendingAnalytics = async function(userId: string, 
     {
       $match: {
         userId: new mongoose.Types.ObjectId(userId),
-        status: 'completed',
         createdAt: { $gte: startDate, $lte: now }
       }
     },
