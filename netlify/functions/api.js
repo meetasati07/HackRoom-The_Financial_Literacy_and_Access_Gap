@@ -1,12 +1,11 @@
-import { Handler, HandlerEvent, HandlerContext } from '@netlify/functions';
-import express from 'express';
-import cors from 'cors';
-import helmet from 'helmet';
-import compression from 'compression';
-import cookieParser from 'cookie-parser';
-import serverless from 'serverless-http';
+const express = require('express');
+const cors = require('cors');
+const helmet = require('helmet');
+const compression = require('compression');
+const cookieParser = require('cookie-parser');
+const serverless = require('serverless-http');
 
-// Import backend modules with proper paths
+// Import backend modules
 const { connectDB } = require('../../backend/src/config/database');
 const authRoutes = require('../../backend/src/routes/auth');
 const userRoutes = require('../../backend/src/routes/user');
@@ -26,10 +25,10 @@ app.use(compression());
 // CORS configuration for production
 app.use(cors({
   origin: [
-    'https://hackwave-fintech.netlify.app',
+    'https://hackroomfinlearn.netlify.app',
     'http://localhost:3000',
     'http://localhost:5173',
-    process.env.FRONTEND_URL || 'https://hackwave-fintech.netlify.app'
+    process.env.FRONTEND_URL || 'https://hackroomfinlearn.netlify.app'
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
@@ -80,7 +79,7 @@ const initializeDatabase = async () => {
 // Create serverless handler
 const serverlessApp = serverless(app);
 
-export const handler: Handler = async (event: HandlerEvent, context: HandlerContext) => {
+exports.handler = async (event, context) => {
   // Ensure database is connected
   try {
     await initializeDatabase();
