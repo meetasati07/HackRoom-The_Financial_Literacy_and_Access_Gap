@@ -1,3 +1,4 @@
+import React from 'react';
 import { useState, useEffect } from 'react';
 import Navigation from './components/Navigation';
 import LandingPage from './components/LandingPage';
@@ -10,6 +11,7 @@ import LoginModal from './components/LoginModal';
 import QuizModal from './components/QuizModal';
 import { Toaster } from './components/ui/sonner';
 import { Language } from './utils/translations';
+import apiService, { User } from './services/api';
 
 export default function App() {
   const [darkMode, setDarkMode] = useState(false);
@@ -18,14 +20,7 @@ export default function App() {
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showQuizModal, setShowQuizModal] = useState(false);
   const [language, setLanguage] = useState<Language>('en');
-  const [user, setUser] = useState<{
-    name: string;
-    mobile: string;
-    email: string;
-    coins: number;
-    level: string;
-    completedQuiz: boolean;
-  } | null>(null);
+  const [user, setUser] = useState<User | null>(null);
 
   // Initialize dark mode from localStorage
   useEffect(() => {
@@ -44,12 +39,23 @@ export default function App() {
     }
   }, []);
 
-  // Initialize user from localStorage
+  // Initialize user from API
   useEffect(() => {
-    const savedUser = localStorage.getItem('fintechUser');
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
-    }
+    const initializeUser = async () => {
+      if (apiService.isAuthenticated()) {
+        try {
+          const response = await apiService.getCurrentUser();
+          if (response.success && response.data) {
+            setUser(response.data.user);
+          }
+        } catch (error) {
+          console.error('Failed to get current user:', error);
+          apiService.clearToken();
+        }
+      }
+    };
+
+    initializeUser();
   }, []);
 
   const toggleDarkMode = () => {
@@ -77,50 +83,71 @@ export default function App() {
     }
   };
 
-  const handleLoginSuccess = (userData: { name: string; mobile: string; email: string }) => {
+  const handleLoginSuccess = async (userData: { name: string; mobile: string; email: string }) => {
     setShowLoginModal(false);
-    setShowQuizModal(true);
-    // Keep body scroll locked for quiz modal
-    // Save temporary user data (will be completed after quiz)
-    const tempUser = {
-      name: userData.name,
-      mobile: userData.mobile,
-      email: userData.email,
-      coins: 0,
-      level: 'Beginner',
-      completedQuiz: false,
-    };
-    setUser(tempUser);
+    
+    // Get the full user data from API
+    try {
+      const response = await apiService.getCurrentUser();
+      if (response.success && response.data) {
+        setUser(response.data.user);
+      }
+    } catch (error) {
+      console.error('Failed to get user data:', error);
+    }
   };
 
-  const handleQuizComplete = (quizResult: { coins: number; level: string }) => {
-    if (user) {
-      const updatedUser = {
-        ...user,
-        coins: quizResult.coins,
-        level: quizResult.level,
-        completedQuiz: true,
-      };
-      setUser(updatedUser);
-      localStorage.setItem('fintechUser', JSON.stringify(updatedUser));
+  const handleRegistrationSuccess = async (userData: { name: string; mobile: string; email: string }) => {
+    setShowLoginModal(false);
+    setShowQuizModal(true);
+    
+    // Get the full user data from API
+    try {
+      const response = await apiService.getCurrentUser();
+      if (response.success && response.data) {
+        setUser(response.data.user);
+      }
+    } catch (error) {
+      console.error('Failed to get user data:', error);
     }
+  };
+
+  const handleQuizComplete = async (quizResult: { coins: number; level: string }) => {
+    try {
+      const response = await apiService.completeQuiz(quizResult.coins, quizResult.level);
+      if (response.success && response.data) {
+        setUser(response.data.user);
+      }
+    } catch (error) {
+      console.error('Failed to complete quiz:', error);
+    }
+    
     setShowQuizModal(false);
     // Restore body scroll when modal closes
     document.body.style.overflow = 'unset';
     setCurrentPage('dashboard');
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await apiService.logout();
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+    
     setUser(null);
-    localStorage.removeItem('fintechUser');
     setCurrentPage('home');
   };
 
-  const handleCoinsUpdate = (newCoins: number) => {
-    if (user) {
-      const updatedUser = { ...user, coins: newCoins };
-      setUser(updatedUser);
-      localStorage.setItem('fintechUser', JSON.stringify(updatedUser));
+  const handleCoinsUpdate = async (newCoins: number) => {
+    try {
+      const response = await apiService.updateCoins(newCoins);
+      if (response.success && user) {
+        const updatedUser = { ...user, coins: newCoins };
+        setUser(updatedUser);
+      }
+    } catch (error) {
+      console.error('Failed to update coins:', error);
     }
   };
 
@@ -183,6 +210,7 @@ export default function App() {
             document.body.style.overflow = 'unset';
           }}
           onLoginSuccess={handleLoginSuccess}
+          onRegistrationSuccess={handleRegistrationSuccess}
           language={language}
         />
       )}

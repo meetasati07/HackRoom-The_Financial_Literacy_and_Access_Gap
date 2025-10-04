@@ -1,17 +1,21 @@
+import React from 'react';
 import { useState } from 'react';
 import { X, User, Phone, Mail, Lock, Shield, CheckCircle, ArrowRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
+import apiService from '../services/api';
 
 interface LoginModalProps {
   onClose: () => void;
   onLoginSuccess: (userData: { name: string; mobile: string; email: string }) => void;
+  onRegistrationSuccess: (userData: { name: string; mobile: string; email: string }) => void;
+  language?: any;
 }
 
-export default function LoginModal({ onClose, onLoginSuccess }: LoginModalProps) {
+export default function LoginModal({ onClose, onLoginSuccess, onRegistrationSuccess, language }: LoginModalProps) {
   const [mode, setMode] = useState<'signup' | 'login'>('signup');
   
   // Signup fields
@@ -26,7 +30,7 @@ export default function LoginModal({ onClose, onLoginSuccess }: LoginModalProps)
   
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSignup = (e: React.FormEvent) => {
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!signupName || !signupMobile || !signupEmail || !signupPassword) {
@@ -51,24 +55,30 @@ export default function LoginModal({ onClose, onLoginSuccess }: LoginModalProps)
 
     setIsSubmitting(true);
     
-    // Save to localStorage (in real app, this would be an API call)
-    const userData = {
-      name: signupName,
-      mobile: signupMobile,
-      email: signupEmail,
-      password: signupPassword,
-    };
-    
-    localStorage.setItem(`user_${signupMobile}`, JSON.stringify(userData));
-    
-    setTimeout(() => {
+    try {
+      const response = await apiService.register({
+        name: signupName,
+        mobile: signupMobile,
+        email: signupEmail,
+        password: signupPassword,
+      });
+
+      if (response.success) {
+        toast.success('Account created successfully! 🎉');
+        onRegistrationSuccess({ 
+          name: response.data.user.name, 
+          mobile: response.data.user.mobile, 
+          email: response.data.user.email 
+        });
+      }
+    } catch (error: any) {
+      toast.error(error.message || 'Registration failed. Please try again.');
+    } finally {
       setIsSubmitting(false);
-      toast.success('Account created successfully! 🎉');
-      onLoginSuccess({ name: signupName, mobile: signupMobile, email: signupEmail });
-    }, 1500);
+    }
   };
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!loginMobile || !loginPassword) {
@@ -83,27 +93,22 @@ export default function LoginModal({ onClose, onLoginSuccess }: LoginModalProps)
 
     setIsSubmitting(true);
 
-    // Check localStorage for user (in real app, this would be an API call)
-    const savedUser = localStorage.getItem(`user_${loginMobile}`);
-    
-    setTimeout(() => {
+    try {
+      const response = await apiService.login(loginMobile, loginPassword);
+
+      if (response.success) {
+        toast.success('Login successful! 🎉');
+        onLoginSuccess({ 
+          name: response.data.user.name, 
+          mobile: response.data.user.mobile, 
+          email: response.data.user.email 
+        });
+      }
+    } catch (error: any) {
+      toast.error(error.message || 'Login failed. Please try again.');
+    } finally {
       setIsSubmitting(false);
-      
-      if (!savedUser) {
-        toast.error('Account not found. Please sign up first.');
-        return;
-      }
-
-      const userData = JSON.parse(savedUser);
-      
-      if (userData.password !== loginPassword) {
-        toast.error('Incorrect password. Please try again.');
-        return;
-      }
-
-      toast.success('Login successful! 🎉');
-      onLoginSuccess({ name: userData.name, mobile: userData.mobile, email: userData.email });
-    }, 1000);
+    }
   };
 
   return (

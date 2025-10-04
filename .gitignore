@@ -1,1 +1,16 @@
-node_modules
+/node_modules
+/dist
+/build
+/logs
+/temp
+/cache
+/backup
+/config
+/data
+/docs
+/logs
+/temp
+/cache
+/backup
+
+.env
