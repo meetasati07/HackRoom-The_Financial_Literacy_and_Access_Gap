@@ -1,3 +1,4 @@
+import React from 'react';
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -16,7 +17,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Badge } from './ui/badge';
 import { Separator } from './ui/separator';
 import { Switch } from './ui/switch';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 import { PieChart, Pie, Cell, BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Language, translations } from '../utils/translations';
 import AddExpenseModal from './AddExpenseModal';
@@ -78,6 +79,8 @@ export default function MoneyManagementPage({ user, language, onCoinsUpdate, ini
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [showIncomeInput, setShowIncomeInput] = useState(false);
   const [tempIncome, setTempIncome] = useState('50000');
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+  const [tempCategoryLimit, setTempCategoryLimit] = useState('');
   const [activeIndex, setActiveIndex] = useState<number | undefined>(undefined);
   const [activeTab, setActiveTab] = useState(initialTab);
   const [showAddExpenseModal, setShowAddExpenseModal] = useState(false);
@@ -98,24 +101,41 @@ export default function MoneyManagementPage({ user, language, onCoinsUpdate, ini
   useEffect(() => {
     const fetchFinancialData = async () => {
       if (!user) {
-        // Load categories from localStorage on mount
-        const savedCategories = localStorage.getItem('moneyCategories');
-        if (savedCategories) {
-          const parsedCategories = JSON.parse(savedCategories);
-          // Merge saved data with initial categories to preserve icon components
-          const mergedCategories = initialCategories.map(initCat => {
-            const savedCat = parsedCategories.find((c: any) => c.id === initCat.id);
-            if (savedCat) {
-              return {
-                ...initCat,
-                spent: savedCat.spent,
-                limit: savedCat.limit,
-                percentage: savedCat.percentage,
-              };
+        try {
+          // Load categories from localStorage on mount
+          const savedCategories = localStorage.getItem('moneyCategories');
+          const savedIncome = localStorage.getItem('monthlyIncome');
+          
+          if (savedIncome) {
+            const parsedIncome = parseInt(savedIncome);
+            if (!isNaN(parsedIncome) && parsedIncome > 0) {
+              setMonthlyIncome(parsedIncome);
+              setTempIncome(parsedIncome.toString());
             }
-            return initCat;
-          });
-          setCategories(mergedCategories);
+          }
+          
+          if (savedCategories) {
+            const parsedCategories = JSON.parse(savedCategories);
+            // Merge saved data with initial categories to preserve icon components
+            const mergedCategories = initialCategories.map(initCat => {
+              const savedCat = parsedCategories.find((c: any) => c.id === initCat.id);
+              if (savedCat && typeof savedCat.spent === 'number' && typeof savedCat.limit === 'number') {
+                return {
+                  ...initCat,
+                  spent: Math.max(0, savedCat.spent),
+                  limit: Math.max(1, savedCat.limit),
+                  percentage: Math.round((Math.max(0, savedCat.spent) / Math.max(1, savedCat.limit)) * 100),
+                };
+              }
+              return initCat;
+            });
+            setCategories(mergedCategories);
+          }
+        } catch (error) {
+          console.error('Error loading saved data:', error);
+          // Reset to defaults if localStorage is corrupted
+          localStorage.removeItem('moneyCategories');
+          localStorage.removeItem('monthlyIncome');
         }
         setLoading(false);
         return;
@@ -160,36 +180,49 @@ export default function MoneyManagementPage({ user, language, onCoinsUpdate, ini
     fetchFinancialData();
   }, [user]);
 
-  // Save categories to localStorage whenever they change
+  // Save categories and income to localStorage whenever they change
   useEffect(() => {
-    // Save only the data, not the icon components
-    const categoriesToSave = categories.map(cat => ({
-      id: cat.id,
-      name: cat.name,
-      color: cat.color,
-      spent: cat.spent,
-      limit: cat.limit,
-      percentage: cat.percentage,
-    }));
-    localStorage.setItem('moneyCategories', JSON.stringify(categoriesToSave));
-    
-    // Update weekly goals with total spending
-    const totalWeeklySpent = categories.reduce((sum, cat) => sum + cat.spent, 0);
-    localStorage.setItem('weeklyTotalSpent', totalWeeklySpent.toString());
+    try {
+      // Save only the data, not the icon components
+      const categoriesToSave = categories.map(cat => ({
+        id: cat.id,
+        name: cat.name,
+        color: cat.color,
+        spent: Math.max(0, cat.spent || 0),
+        limit: Math.max(1, cat.limit || 1000),
+        percentage: cat.percentage || 0,
+      }));
+      localStorage.setItem('moneyCategories', JSON.stringify(categoriesToSave));
+      
+      // Update weekly goals with total spending
+      const totalWeeklySpent = categories.reduce((sum, cat) => sum + (cat.spent || 0), 0);
+      localStorage.setItem('weeklyTotalSpent', totalWeeklySpent.toString());
+    } catch (error) {
+      console.error('Error saving categories to localStorage:', error);
+    }
   }, [categories]);
+
+  // Save monthly income to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('monthlyIncome', monthlyIncome.toString());
+    } catch (error) {
+      console.error('Error saving income to localStorage:', error);
+    }
+  }, [monthlyIncome]);
 
   // Update active tab when initialTab prop changes
   useEffect(() => {
     setActiveTab(initialTab);
   }, [initialTab]);
 
-  const totalSpent = categories.reduce((sum, cat) => sum + cat.spent, 0);
-  const totalLimit = categories.reduce((sum, cat) => sum + cat.limit, 0);
-  const remainingMoney = monthlyIncome - totalSpent;
-  const spendingPercentage = (totalSpent / monthlyIncome) * 100;
+  const totalSpent = categories.reduce((sum, cat) => sum + (cat.spent || 0), 0);
+  const totalLimit = categories.reduce((sum, cat) => sum + (cat.limit || 0), 0);
+  const remainingMoney = Math.max(0, monthlyIncome - totalSpent);
+  const spendingPercentage = monthlyIncome > 0 ? (totalSpent / monthlyIncome) * 100 : 0;
 
-  const overSpentCategories = categories.filter(cat => cat.percentage > 100);
-  const underSpentCategories = categories.filter(cat => cat.percentage < 50);
+  const overSpentCategories = categories.filter(cat => (cat.percentage || 0) > 100);
+  const underSpentCategories = categories.filter(cat => (cat.percentage || 0) < 50);
 
   const suggestions: Suggestion[] = [
     {
@@ -232,26 +265,54 @@ export default function MoneyManagementPage({ user, language, onCoinsUpdate, ini
 
   const handleIncomeUpdate = () => {
     const newIncome = parseInt(tempIncome);
-    if (newIncome > 0) {
-      setMonthlyIncome(newIncome);
-      setShowIncomeInput(false);
-      toast.success(`Income updated to ₹${newIncome.toLocaleString()}`);
-      
-      // Award coins for updating income
-      if (user && onCoinsUpdate) {
-        onCoinsUpdate(user.coins + 10);
-        toast.success('🪙 Earned 10 coins for updating income!');
-      }
+    if (isNaN(newIncome) || newIncome <= 0) {
+      toast.error('Please enter a valid income amount (greater than 0)');
+      return;
+    }
+    if (newIncome > 10000000) {
+      toast.error('Income amount seems too high. Please enter a reasonable amount.');
+      return;
+    }
+    
+    setMonthlyIncome(newIncome);
+    setShowIncomeInput(false);
+    toast.success(`Income updated to ₹${newIncome.toLocaleString()}`);
+    
+    // Award coins for updating income
+    if (user && onCoinsUpdate) {
+      onCoinsUpdate(user.coins + 10);
+      toast.success('🪙 Earned 10 coins for updating income!');
     }
   };
 
   const handleCategoryLimitUpdate = (categoryId: string, newLimit: number) => {
+    if (isNaN(newLimit) || newLimit <= 0) {
+      toast.error('Please enter a valid limit amount (greater than 0)');
+      return;
+    }
+    if (newLimit > 1000000) {
+      toast.error('Limit amount seems too high. Please enter a reasonable amount.');
+      return;
+    }
+    
     setCategories(categories.map(cat => 
       cat.id === categoryId 
-        ? { ...cat, limit: newLimit, percentage: Math.round((cat.spent / newLimit) * 100) }
+        ? { ...cat, limit: newLimit, percentage: Math.round(((cat.spent || 0) / newLimit) * 100) }
         : cat
     ));
+    setEditingCategoryId(null);
+    setTempCategoryLimit('');
     toast.success('Limit updated successfully');
+  };
+
+  const handleStartEditingLimit = (categoryId: string, currentLimit: number) => {
+    setEditingCategoryId(categoryId);
+    setTempCategoryLimit(currentLimit.toString());
+  };
+
+  const handleCancelEditingLimit = () => {
+    setEditingCategoryId(null);
+    setTempCategoryLimit('');
   };
 
   const handleConnectUPI = () => {
@@ -281,13 +342,20 @@ export default function MoneyManagementPage({ user, language, onCoinsUpdate, ini
   };
 
   const handleAddExpense = (categoryId: string, amount: number, description: string) => {
+    if (isNaN(amount) || amount <= 0) {
+      toast.error('Please enter a valid expense amount');
+      return;
+    }
+    
     const updatedCategories = categories.map(cat => {
       if (cat.id === categoryId) {
-        const newSpent = cat.spent + amount;
-        const newPercentage = Math.round((newSpent / cat.limit) * 100);
+        const currentSpent = cat.spent || 0;
+        const currentLimit = cat.limit || 1000;
+        const newSpent = currentSpent + amount;
+        const newPercentage = Math.round((newSpent / currentLimit) * 100);
         
         // Check if crossed limit
-        const wasUnderLimit = cat.percentage <= 100;
+        const wasUnderLimit = (cat.percentage || 0) <= 100;
         const isOverLimit = newPercentage > 100;
         
         if (wasUnderLimit && isOverLimit && notificationsEnabled) {
@@ -307,7 +375,7 @@ export default function MoneyManagementPage({ user, language, onCoinsUpdate, ini
 
     setCategories(updatedCategories);
     
-    toast.success(`Added ₹${amount} to ${selectedCategory?.name}`, {
+    toast.success(`Added ₹${amount.toLocaleString()} to ${selectedCategory?.name}`, {
       description: description,
       duration: 3000,
     });
@@ -441,12 +509,34 @@ export default function MoneyManagementPage({ user, language, onCoinsUpdate, ini
                       type="number"
                       value={tempIncome}
                       onChange={(e) => setTempIncome(e.target.value)}
-                      placeholder="Enter income"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          handleIncomeUpdate();
+                        } else if (e.key === 'Escape') {
+                          setShowIncomeInput(false);
+                          setTempIncome(monthlyIncome.toString());
+                        }
+                      }}
+                      placeholder="Enter monthly income"
                       className="text-lg"
+                      min="1"
+                      max="10000000"
                     />
-                    <Button onClick={handleIncomeUpdate} className="w-full">
-                      Save Income
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button onClick={handleIncomeUpdate} className="flex-1">
+                        Save Income
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        onClick={() => {
+                          setShowIncomeInput(false);
+                          setTempIncome(monthlyIncome.toString());
+                        }}
+                        className="flex-1"
+                      >
+                        Cancel
+                      </Button>
+                    </div>
                   </div>
                 ) : (
                   <>
@@ -568,6 +658,7 @@ export default function MoneyManagementPage({ user, language, onCoinsUpdate, ini
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: 0.3 + index * 0.05 }}
+                      className="relative"
                     >
                       <Card className={`border-2 transition-all hover:shadow-lg ${
                         isOverLimit 
@@ -637,10 +728,7 @@ export default function MoneyManagementPage({ user, language, onCoinsUpdate, ini
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => {
-                                  const newLimit = prompt(`Set new limit for ${category.name}:`, category.limit.toString());
-                                  if (newLimit) handleCategoryLimitUpdate(category.id, parseInt(newLimit));
-                                }}
+                                onClick={() => handleStartEditingLimit(category.id, category.limit)}
                                 className="text-xs"
                               >
                                 Set Limit
@@ -648,6 +736,50 @@ export default function MoneyManagementPage({ user, language, onCoinsUpdate, ini
                             </div>
                           </div>
                         </CardContent>
+                        
+                        {/* Inline Limit Editor */}
+                        {editingCategoryId === category.id && (
+                          <div className="absolute inset-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm rounded-lg flex items-center justify-center p-4">
+                            <div className="w-full max-w-xs space-y-3">
+                              <Label className="text-sm font-medium">Set limit for {category.name}</Label>
+                              <Input
+                                type="number"
+                                value={tempCategoryLimit}
+                                onChange={(e) => setTempCategoryLimit(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter' && tempCategoryLimit && !isNaN(parseInt(tempCategoryLimit))) {
+                                    handleCategoryLimitUpdate(category.id, parseInt(tempCategoryLimit));
+                                  } else if (e.key === 'Escape') {
+                                    handleCancelEditingLimit();
+                                  }
+                                }}
+                                placeholder="Enter limit amount"
+                                className="text-center"
+                                min="1"
+                                max="1000000"
+                                autoFocus
+                              />
+                              <div className="flex gap-2">
+                                <Button 
+                                  size="sm" 
+                                  onClick={() => handleCategoryLimitUpdate(category.id, parseInt(tempCategoryLimit))}
+                                  className="flex-1"
+                                  disabled={!tempCategoryLimit || isNaN(parseInt(tempCategoryLimit))}
+                                >
+                                  Save
+                                </Button>
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  onClick={handleCancelEditingLimit}
+                                  className="flex-1"
+                                >
+                                  Cancel
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </Card>
                     </motion.div>
                   );

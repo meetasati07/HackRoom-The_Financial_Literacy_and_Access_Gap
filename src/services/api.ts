@@ -164,31 +164,15 @@ class ApiService {
   }
 
   // Transaction methods
-  async createTransactionOrder(orderData: {
+  async createTransaction(transactionData: {
     amount: number;
     description: string;
     category: string;
-    merchant: string;
-    paymentMethod: string;
-    metadata?: any;
+    merchant?: string;
+    paymentMethod?: string;
+    notes?: string;
   }): Promise<ApiResponse<any>> {
-    return this.request<ApiResponse<any>>('/transactions/create-order', {
-      method: 'POST',
-      body: JSON.stringify(orderData),
-    });
-  }
-
-  async verifyTransaction(transactionData: {
-    razorpayOrderId: string;
-    razorpayPaymentId: string;
-    razorpaySignature: string;
-    description: string;
-    category: string;
-    merchant: string;
-    paymentMethod: string;
-    metadata?: any;
-  }): Promise<ApiResponse<any>> {
-    return this.request<ApiResponse<any>>('/transactions/verify-payment', {
+    return this.request<ApiResponse<any>>('/transactions', {
       method: 'POST',
       body: JSON.stringify(transactionData),
     });
