@@ -22,6 +22,9 @@ import { Language, translations } from '../utils/translations';
 import AddExpenseModal from './AddExpenseModal';
 import SentimentAnalysisModal from './SentimentAnalysisModal';
 import WhatIfSimulator from './WhatIfSimulator';
+import TransactionHistory from './TransactionHistory';
+import AddTransactionModal from './AddTransactionModal';
+import apiService from '../services/api';
 
 interface MoneyManagementPageProps {
   user: { name: string; coins: number; level: string } | null;
@@ -80,29 +83,82 @@ export default function MoneyManagementPage({ user, language, onCoinsUpdate, ini
   const [showAddExpenseModal, setShowAddExpenseModal] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [showSentimentModal, setShowSentimentModal] = useState(false);
+  const [financialData, setFinancialData] = useState({
+    monthlyIncome: 50000,
+    categories: initialCategories,
+    totalSpent: 0,
+    remainingMoney: 50000,
+    spendingPercentage: 0,
+    weeklyTrends: []
+  });
+  const [loading, setLoading] = useState(true);
   const t = translations[language];
 
-  // Load categories from localStorage on mount
+  // Load financial data and categories
   useEffect(() => {
-    const savedCategories = localStorage.getItem('moneyCategories');
-    if (savedCategories) {
-      const parsedCategories = JSON.parse(savedCategories);
-      // Merge saved data with initial categories to preserve icon components
-      const mergedCategories = initialCategories.map(initCat => {
-        const savedCat = parsedCategories.find((c: any) => c.id === initCat.id);
-        if (savedCat) {
-          return {
-            ...initCat,
-            spent: savedCat.spent,
-            limit: savedCat.limit,
-            percentage: savedCat.percentage,
-          };
+    const fetchFinancialData = async () => {
+      if (!user) {
+        // Load categories from localStorage on mount
+        const savedCategories = localStorage.getItem('moneyCategories');
+        if (savedCategories) {
+          const parsedCategories = JSON.parse(savedCategories);
+          // Merge saved data with initial categories to preserve icon components
+          const mergedCategories = initialCategories.map(initCat => {
+            const savedCat = parsedCategories.find((c: any) => c.id === initCat.id);
+            if (savedCat) {
+              return {
+                ...initCat,
+                spent: savedCat.spent,
+                limit: savedCat.limit,
+                percentage: savedCat.percentage,
+              };
+            }
+            return initCat;
+          });
+          setCategories(mergedCategories);
         }
-        return initCat;
-      });
-      setCategories(mergedCategories);
-    }
-  }, []);
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const response = await apiService.getMoneyManagementData();
+        if (response.success && response.data) {
+          // Merge API data with initial categories to preserve icon components
+          const mergedCategories = initialCategories.map(initCat => {
+            const apiCat = response.data.categories.find((c: any) => c.id === initCat.id);
+            if (apiCat) {
+              return {
+                ...initCat,
+                spent: apiCat.spent,
+                limit: apiCat.limit,
+                percentage: apiCat.percentage,
+              };
+            }
+            return initCat;
+          });
+
+          setFinancialData({
+            monthlyIncome: response.data.monthlyIncome,
+            categories: mergedCategories,
+            totalSpent: response.data.totalSpent,
+            remainingMoney: response.data.remainingMoney,
+            spendingPercentage: response.data.spendingPercentage,
+            weeklyTrends: response.data.weeklyTrends
+          });
+          setMonthlyIncome(response.data.monthlyIncome);
+          setCategories(mergedCategories);
+        }
+      } catch (error) {
+        console.error('Failed to fetch money management data:', error);
+        // Keep default values on error
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchFinancialData();
+  }, [user]);
 
   // Save categories to localStorage whenever they change
   useEffect(() => {
@@ -274,6 +330,45 @@ export default function MoneyManagementPage({ user, language, onCoinsUpdate, ini
     toast.success('All category expenses have been reset to ₹0');
   };
 
+  const refreshFinancialData = async () => {
+    if (!user) return;
+    
+    try {
+      setLoading(true);
+      const response = await apiService.getMoneyManagementData();
+      if (response.success && response.data) {
+        // Merge API data with initial categories to preserve icon components
+        const mergedCategories = initialCategories.map(initCat => {
+          const apiCat = response.data.categories.find((c: any) => c.id === initCat.id);
+          if (apiCat) {
+            return {
+              ...initCat,
+              spent: apiCat.spent,
+              limit: apiCat.limit,
+              percentage: apiCat.percentage,
+            };
+          }
+          return initCat;
+        });
+
+        setFinancialData({
+          monthlyIncome: response.data.monthlyIncome,
+          categories: mergedCategories,
+          totalSpent: response.data.totalSpent,
+          remainingMoney: response.data.remainingMoney,
+          spendingPercentage: response.data.spendingPercentage,
+          weeklyTrends: response.data.weeklyTrends
+        });
+        setMonthlyIncome(response.data.monthlyIncome);
+        setCategories(mergedCategories);
+      }
+    } catch (error) {
+      console.error('Failed to refresh financial data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen py-16 md:py-24 bg-gradient-to-b from-background via-blue-50/30 to-background dark:from-background dark:via-blue-950/10 dark:to-background">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -283,14 +378,38 @@ export default function MoneyManagementPage({ user, language, onCoinsUpdate, ini
           animate={{ opacity: 1, y: 0 }}
           className="mb-10"
         >
-          <h1 className="text-4xl md:text-5xl mb-3">
-            <span className="bg-gradient-to-r from-blue-600 via-purple-600 to-green-600 bg-clip-text text-transparent">
-              Money Management
-            </span>
-          </h1>
-          <p className="text-muted-foreground text-lg">
-            Track expenses, set limits, and get smart suggestions for better financial health
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-4xl md:text-5xl mb-3">
+                <span className="bg-gradient-to-r from-blue-600 via-purple-600 to-green-600 bg-clip-text text-transparent">
+                  Money Management
+                </span>
+              </h1>
+              <p className="text-muted-foreground text-lg">
+                Track expenses, set limits, and get smart suggestions for better financial health
+              </p>
+            </div>
+            {user && (
+              <Button
+                onClick={refreshFinancialData}
+                disabled={loading}
+                variant="outline"
+                className="flex items-center gap-2"
+              >
+                {loading ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                    Refreshing...
+                  </>
+                ) : (
+                  <>
+                    <ArrowUpRight className="w-4 h-4" />
+                    Refresh Data
+                  </>
+                )}
+              </Button>
+            )}
+          </div>
         </motion.div>
 
         {/* Income & Overview Cards */}
@@ -405,9 +524,10 @@ export default function MoneyManagementPage({ user, language, onCoinsUpdate, ini
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-12">
-          <TabsList className="grid w-full max-w-2xl mx-auto grid-cols-4 mb-10">
+          <TabsList className="grid w-full max-w-3xl mx-auto grid-cols-5 mb-10">
             <TabsTrigger value="categories">Categories</TabsTrigger>
             <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+            <TabsTrigger value="transactions">Transactions</TabsTrigger>
             <TabsTrigger value="advisor">Advisor</TabsTrigger>
             <TabsTrigger value="upi">UPI Connect</TabsTrigger>
           </TabsList>
@@ -556,6 +676,37 @@ export default function MoneyManagementPage({ user, language, onCoinsUpdate, ini
                   </div>
                 </CardContent>
               </Card>
+            </motion.div>
+          </TabsContent>
+
+          {/* Transactions Tab */}
+          <TabsContent value="transactions">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.2 }}
+            >
+              <div className="space-y-6">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+                      Transaction Management
+                    </h2>
+                    <p className="text-gray-600 dark:text-gray-400 mt-1">
+                      Track and manage your financial transactions
+                    </p>
+                  </div>
+                  <AddTransactionModal 
+                    onTransactionAdded={() => {
+                      // Refresh financial data when new transaction is added
+                      refreshFinancialData();
+                    }}
+                    language={language}
+                  />
+                </div>
+                
+                <TransactionHistory user={user} language={language} />
+              </div>
             </motion.div>
           </TabsContent>
 

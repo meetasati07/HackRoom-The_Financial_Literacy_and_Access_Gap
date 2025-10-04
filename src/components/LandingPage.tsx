@@ -3,6 +3,8 @@ import { Button } from './ui/button';
 import { ArrowRight, TrendingUp, Target, Gamepad2, PiggyBank, Shield, Sparkles } from 'lucide-react';
 import { ImageWithFallback } from './figma/ImageWithFallback';
 import { Language, translations } from '../utils/translations';
+import { useState, useEffect } from 'react';
+import apiService from '../services/api';
 
 interface LandingPageProps {
   onGetStarted: () => void;
@@ -12,6 +14,34 @@ interface LandingPageProps {
 
 export default function LandingPage({ onGetStarted, isLoggedIn, language }: LandingPageProps) {
   const t = translations[language];
+  const [platformStats, setPlatformStats] = useState({
+    activeUsers: 10000,
+    moneySaved: 500000000,
+    userRating: 4.8
+  });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchPlatformStats = async () => {
+      try {
+        const response = await apiService.getPlatformStats();
+        if (response.success && response.data) {
+          setPlatformStats({
+            activeUsers: response.data.activeUsers,
+            moneySaved: response.data.moneySaved,
+            userRating: response.data.userRating
+          });
+        }
+      } catch (error) {
+        console.error('Failed to fetch platform stats:', error);
+        // Keep default values on error
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchPlatformStats();
+  }, []);
   
   return (
     <div className="min-h-screen">
@@ -64,15 +94,21 @@ export default function LandingPage({ onGetStarted, isLoggedIn, language }: Land
 
               <div className="grid grid-cols-3 gap-6 mt-12">
                 <div>
-                  <div className="text-3xl font-bold text-blue-600">10K+</div>
+                  <div className="text-3xl font-bold text-blue-600">
+                    {loading ? '...' : `${platformStats.activeUsers.toLocaleString()}+`}
+                  </div>
                   <div className="text-sm text-muted-foreground">{t.activeUsers}</div>
                 </div>
                 <div>
-                  <div className="text-3xl font-bold text-purple-600">₹50Cr+</div>
+                  <div className="text-3xl font-bold text-purple-600">
+                    {loading ? '...' : `₹${(platformStats.moneySaved / 10000000).toFixed(0)}Cr+`}
+                  </div>
                   <div className="text-sm text-muted-foreground">{t.moneySaved}</div>
                 </div>
                 <div>
-                  <div className="text-3xl font-bold text-pink-600">4.8★</div>
+                  <div className="text-3xl font-bold text-pink-600">
+                    {loading ? '...' : `${platformStats.userRating}★`}
+                  </div>
                   <div className="text-sm text-muted-foreground">{t.userRating}</div>
                 </div>
               </div>

@@ -150,6 +150,63 @@ class ApiService {
     return response;
   }
 
+  // Financial data methods
+  async getDashboardStats(): Promise<ApiResponse<any>> {
+    return this.request<ApiResponse<any>>('/financial/dashboard-stats');
+  }
+
+  async getMoneyManagementData(): Promise<ApiResponse<any>> {
+    return this.request<ApiResponse<any>>('/financial/money-management');
+  }
+
+  async getPlatformStats(): Promise<ApiResponse<any>> {
+    return this.request<ApiResponse<any>>('/financial/platform-stats');
+  }
+
+  // Transaction methods
+  async createTransactionOrder(orderData: {
+    amount: number;
+    description: string;
+    category: string;
+    merchant: string;
+    paymentMethod: string;
+    metadata?: any;
+  }): Promise<ApiResponse<any>> {
+    return this.request<ApiResponse<any>>('/transactions/create-order', {
+      method: 'POST',
+      body: JSON.stringify(orderData),
+    });
+  }
+
+  async verifyTransaction(transactionData: {
+    razorpayOrderId: string;
+    razorpayPaymentId: string;
+    razorpaySignature: string;
+    description: string;
+    category: string;
+    merchant: string;
+    paymentMethod: string;
+    metadata?: any;
+  }): Promise<ApiResponse<any>> {
+    return this.request<ApiResponse<any>>('/transactions/verify-payment', {
+      method: 'POST',
+      body: JSON.stringify(transactionData),
+    });
+  }
+
+  async getTransactions(queryParams?: string): Promise<ApiResponse<any>> {
+    const endpoint = queryParams ? `/transactions?${queryParams}` : '/transactions';
+    return this.request<ApiResponse<any>>(endpoint);
+  }
+
+  async getTransactionAnalytics(period: 'week' | 'month' | 'year' = 'month'): Promise<ApiResponse<any>> {
+    return this.request<ApiResponse<any>>(`/transactions/analytics?period=${period}`);
+  }
+
+  async getTransactionById(id: string): Promise<ApiResponse<any>> {
+    return this.request<ApiResponse<any>>(`/transactions/${id}`);
+  }
+
   // Token management
   setToken(token: string): void {
     this.token = token;

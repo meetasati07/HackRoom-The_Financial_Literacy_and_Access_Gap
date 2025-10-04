@@ -2,6 +2,8 @@ import { motion } from 'motion/react';
 import { Target, Users, Heart, Shield, Zap, TrendingUp } from 'lucide-react';
 import { Card, CardContent } from './ui/card';
 import { Language, translations } from '../utils/translations';
+import { useState, useEffect } from 'react';
+import apiService from '../services/api';
 
 interface AboutPageProps {
   language: Language;
@@ -9,6 +11,36 @@ interface AboutPageProps {
 
 export default function AboutPage({ language }: AboutPageProps) {
   const t = translations[language];
+  const [platformStats, setPlatformStats] = useState({
+    totalUsers: 10000,
+    totalMoneySaved: 500000000,
+    averageRating: 4.8,
+    gamesCompleted: 50000
+  });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchPlatformStats = async () => {
+      try {
+        const response = await apiService.getPlatformStats();
+        if (response.success && response.data) {
+          setPlatformStats({
+            totalUsers: response.data.totalUsers,
+            totalMoneySaved: response.data.totalMoneySaved,
+            averageRating: response.data.averageRating,
+            gamesCompleted: response.data.gamesCompleted
+          });
+        }
+      } catch (error) {
+        console.error('Failed to fetch platform stats:', error);
+        // Keep default values on error
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchPlatformStats();
+  }, []);
   const values = [
     {
       icon: Target,
@@ -169,19 +201,27 @@ export default function AboutPage({ language }: AboutPageProps) {
           <h2 className="text-3xl text-center mb-12">Our Impact</h2>
           <div className="grid md:grid-cols-4 gap-8 text-center">
             <div>
-              <div className="text-4xl font-bold text-blue-600 mb-2">10,000+</div>
+              <div className="text-4xl font-bold text-blue-600 mb-2">
+                {loading ? '...' : `${platformStats.totalUsers.toLocaleString()}+`}
+              </div>
               <div className="text-muted-foreground">Active Users</div>
             </div>
             <div>
-              <div className="text-4xl font-bold text-purple-600 mb-2">₹50Cr+</div>
+              <div className="text-4xl font-bold text-purple-600 mb-2">
+                {loading ? '...' : `₹${(platformStats.totalMoneySaved / 10000000).toFixed(0)}Cr+`}
+              </div>
               <div className="text-muted-foreground">Money Saved</div>
             </div>
             <div>
-              <div className="text-4xl font-bold text-pink-600 mb-2">50,000+</div>
+              <div className="text-4xl font-bold text-pink-600 mb-2">
+                {loading ? '...' : `${platformStats.gamesCompleted.toLocaleString()}+`}
+              </div>
               <div className="text-muted-foreground">Games Completed</div>
             </div>
             <div>
-              <div className="text-4xl font-bold text-orange-600 mb-2">4.8★</div>
+              <div className="text-4xl font-bold text-orange-600 mb-2">
+                {loading ? '...' : `${platformStats.averageRating}★`}
+              </div>
               <div className="text-muted-foreground">User Rating</div>
             </div>
           </div>

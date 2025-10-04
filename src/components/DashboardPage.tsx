@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   TrendingUp,
@@ -29,6 +29,7 @@ import { ImageWithFallback } from './figma/ImageWithFallback';
 import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { Language, translations } from '../utils/translations';
 import SetGoalModal from './SetGoalModal';
+import apiService from '../services/api';
 
 interface DashboardPageProps {
   user: { name: string; coins: number; level: string } | null;
@@ -96,15 +97,54 @@ const recentActivities = [
 
 export default function DashboardPage({ user, language, onNavigateToMoneyManager, onCoinsUpdate }: DashboardPageProps) {
   const [currentTipIndex, setCurrentTipIndex] = useState(0);
-  const [streak, setStreak] = useState(7);
   const [activeIndex, setActiveIndex] = useState<number | undefined>(undefined);
   const [showGoalModal, setShowGoalModal] = useState(false);
+  const [dashboardData, setDashboardData] = useState({
+    totalIncome: 51000,
+    totalExpense: 33000,
+    totalSavings: 18000,
+    savingsRate: 35.3,
+    streak: 7,
+    expenseData: [],
+    categoryData: [],
+    savingsGoals: [],
+    recentActivities: []
+  });
+  const [loading, setLoading] = useState(true);
   const t = translations[language];
-  
-  const totalIncome = 51000;
-  const totalExpense = 33000;
-  const totalSavings = totalIncome - totalExpense;
-  const savingsRate = ((totalSavings / totalIncome) * 100).toFixed(1);
+
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      if (!user) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const response = await apiService.getDashboardStats();
+        if (response.success && response.data) {
+          setDashboardData({
+            totalIncome: response.data.totalIncome,
+            totalExpense: response.data.totalExpense,
+            totalSavings: response.data.totalSavings,
+            savingsRate: response.data.savingsRate,
+            streak: response.data.streak,
+            expenseData: response.data.expenseData,
+            categoryData: response.data.categoryData,
+            savingsGoals: response.data.savingsGoals,
+            recentActivities: response.data.recentActivities
+          });
+        }
+      } catch (error) {
+        console.error('Failed to fetch dashboard data:', error);
+        // Keep default values on error
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDashboardData();
+  }, [user]);
 
   const currentTip = dailyTips[currentTipIndex];
 
@@ -157,7 +197,9 @@ export default function DashboardPage({ user, language, onNavigateToMoneyManager
                 <Flame className="w-6 h-6" />
               </motion.div>
               <div>
-                <div className="text-2xl font-bold">{streak} {language === 'en' ? 'Days' : language === 'hi' ? 'दिन' : 'दिवस'}</div>
+                <div className="text-2xl font-bold">
+                  {loading ? '...' : `${dashboardData.streak} ${language === 'en' ? 'Days' : language === 'hi' ? 'दिन' : 'दिवस'}`}
+                </div>
                 <div className="text-xs opacity-90">{t.activeDays} 🔥</div>
               </div>
             </motion.div>
@@ -371,7 +413,9 @@ export default function DashboardPage({ user, language, onNavigateToMoneyManager
                 <TrendingUp className="w-4 h-4 text-green-600" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">₹{totalIncome.toLocaleString()}</div>
+                <div className="text-2xl font-bold">
+                  {loading ? '...' : `₹${dashboardData.totalIncome.toLocaleString()}`}
+                </div>
                 <p className="text-xs text-muted-foreground flex items-center gap-1">
                   <TrendingUp className="w-3 h-3 text-green-600" />
                   +8% from last month
@@ -393,7 +437,9 @@ export default function DashboardPage({ user, language, onNavigateToMoneyManager
                 <CreditCard className="w-4 h-4 text-red-600" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">₹{totalExpense.toLocaleString()}</div>
+                <div className="text-2xl font-bold">
+                  {loading ? '...' : `₹${dashboardData.totalExpense.toLocaleString()}`}
+                </div>
                 <p className="text-xs text-muted-foreground flex items-center gap-1">
                   <TrendingDown className="w-3 h-3 text-green-600" />
                   -3% from last month
@@ -415,8 +461,12 @@ export default function DashboardPage({ user, language, onNavigateToMoneyManager
                 <DollarSign className="w-4 h-4 text-blue-600" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">₹{totalSavings.toLocaleString()}</div>
-                <p className="text-xs text-muted-foreground">{savingsRate}% savings rate</p>
+                <div className="text-2xl font-bold">
+                  {loading ? '...' : `₹${dashboardData.totalSavings.toLocaleString()}`}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {loading ? '...' : `${dashboardData.savingsRate.toFixed(1)}% savings rate`}
+                </p>
               </CardContent>
             </Card>
           </motion.div>
@@ -434,7 +484,9 @@ export default function DashboardPage({ user, language, onNavigateToMoneyManager
                 <Target className="w-4 h-4 text-purple-600" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{savingsGoals.length}</div>
+                <div className="text-2xl font-bold">
+                  {loading ? '...' : dashboardData.savingsGoals.length}
+                </div>
                 <p className="text-xs text-muted-foreground">2 on track</p>
               </CardContent>
             </Card>
@@ -455,7 +507,10 @@ export default function DashboardPage({ user, language, onNavigateToMoneyManager
               <Card>
                 <CardContent className="p-6">
                   <div className="space-y-4">
-                    {recentActivities.map((activity, index) => (
+                    {loading ? (
+                      <div className="text-center py-8 text-muted-foreground">Loading activities...</div>
+                    ) : (
+                      dashboardData.recentActivities.map((activity, index) => (
                       <motion.div
                         key={index}
                         initial={{ opacity: 0, x: -20 }}
@@ -472,11 +527,9 @@ export default function DashboardPage({ user, language, onNavigateToMoneyManager
                             'bg-yellow-100 dark:bg-yellow-950/30'
                           }`}
                         >
-                          <activity.icon className={`w-5 h-5 ${
-                            activity.type === 'expense' ? 'text-red-600' :
-                            activity.type === 'income' ? 'text-green-600' :
-                            'text-yellow-600'
-                          }`} />
+                          {activity.type === 'expense' && <CreditCard className="w-5 h-5 text-red-600" />}
+                          {activity.type === 'income' && <DollarSign className="w-5 h-5 text-green-600" />}
+                          {activity.type === 'achievement' && <Trophy className="w-5 h-5 text-yellow-600" />}
                         </motion.div>
                         <div className="flex-1">
                           <div className="font-medium">{activity.title}</div>
@@ -494,7 +547,8 @@ export default function DashboardPage({ user, language, onNavigateToMoneyManager
                         </div>
                         <ChevronRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                       </motion.div>
-                    ))}
+                      ))
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -736,7 +790,7 @@ export default function DashboardPage({ user, language, onNavigateToMoneyManager
               </CardHeader>
               <CardContent className="pt-6">
                 <ResponsiveContainer width="100%" height={320}>
-                  <AreaChart data={expenseData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                  <AreaChart data={loading ? [] : dashboardData.expenseData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                     <defs>
                       <linearGradient id="colorIncome" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="#10b981" stopOpacity={0.9} />
@@ -824,7 +878,7 @@ export default function DashboardPage({ user, language, onNavigateToMoneyManager
                   <ResponsiveContainer width="100%" height={340}>
                     <PieChart>
                       <Pie
-                        data={categoryData}
+                        data={loading ? [] : dashboardData.categoryData}
                         cx="50%"
                         cy="50%"
                         labelLine={false}
@@ -843,7 +897,7 @@ export default function DashboardPage({ user, language, onNavigateToMoneyManager
                         onMouseEnter={(_, index) => setActiveIndex(index)}
                         onMouseLeave={() => setActiveIndex(undefined)}
                       >
-                        {categoryData.map((entry, index) => (
+                        {(loading ? [] : dashboardData.categoryData).map((entry, index) => (
                           <Cell 
                             key={`cell-${index}`} 
                             fill={entry.color}
@@ -876,16 +930,16 @@ export default function DashboardPage({ user, language, onNavigateToMoneyManager
                         >
                           <div 
                             className="w-3 h-3 rounded-full mx-auto mb-2"
-                            style={{ backgroundColor: categoryData[activeIndex].color }}
+                            style={{ backgroundColor: dashboardData.categoryData[activeIndex]?.color }}
                           />
                           <div className="text-xs text-muted-foreground font-medium mb-1">
-                            {categoryData[activeIndex].name}
+                            {dashboardData.categoryData[activeIndex]?.name}
                           </div>
-                          <div className="text-2xl font-bold" style={{ color: categoryData[activeIndex].color }}>
-                            ₹{categoryData[activeIndex].value.toLocaleString()}
+                          <div className="text-2xl font-bold" style={{ color: dashboardData.categoryData[activeIndex]?.color }}>
+                            ₹{dashboardData.categoryData[activeIndex]?.value.toLocaleString()}
                           </div>
                           <div className="text-xs text-muted-foreground mt-1">
-                            {((categoryData[activeIndex].value / totalExpense) * 100).toFixed(1)}%
+                            {((dashboardData.categoryData[activeIndex]?.value / dashboardData.totalExpense) * 100).toFixed(1)}%
                           </div>
                         </motion.div>
                       ) : (
@@ -901,7 +955,7 @@ export default function DashboardPage({ user, language, onNavigateToMoneyManager
                             Total Expenses
                           </div>
                           <div className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-                            ₹{totalExpense.toLocaleString()}
+                            ₹{dashboardData.totalExpense.toLocaleString()}
                           </div>
                           <div className="text-xs text-muted-foreground mt-1">
                             This Month
@@ -914,7 +968,7 @@ export default function DashboardPage({ user, language, onNavigateToMoneyManager
 
                 {/* Category Legend with Progress Bars */}
                 <div className="mt-8 space-y-3">
-                  {categoryData.map((category, index) => (
+                  {(loading ? [] : dashboardData.categoryData).map((category, index) => (
                     <motion.div
                       key={index}
                       initial={{ opacity: 0, x: -20 }}
@@ -943,7 +997,7 @@ export default function DashboardPage({ user, language, onNavigateToMoneyManager
                         </div>
                         <div className="flex items-center gap-3">
                           <span className="text-xs text-muted-foreground">
-                            {((category.value / totalExpense) * 100).toFixed(0)}%
+                            {((category.value / dashboardData.totalExpense) * 100).toFixed(0)}%
                           </span>
                           <span className="text-sm font-bold">
                             ₹{(category.value / 1000).toFixed(1)}k
@@ -954,7 +1008,7 @@ export default function DashboardPage({ user, language, onNavigateToMoneyManager
                       <div className="h-1.5 bg-gray-200 dark:bg-gray-800 rounded-full overflow-hidden">
                         <motion.div
                           initial={{ width: 0 }}
-                          animate={{ width: `${(category.value / totalExpense) * 100}%` }}
+                          animate={{ width: `${(category.value / dashboardData.totalExpense) * 100}%` }}
                           transition={{ duration: 1, delay: 1.3 + index * 0.08 }}
                           className="h-full rounded-full"
                           style={{ 
@@ -1025,7 +1079,7 @@ export default function DashboardPage({ user, language, onNavigateToMoneyManager
           </div>
           
           <div className="grid md:grid-cols-3 gap-6">
-            {savingsGoals.map((goal, index) => {
+            {(loading ? [] : dashboardData.savingsGoals).map((goal, index) => {
               const percentage = (goal.current / goal.target) * 100;
               return (
                 <motion.div
