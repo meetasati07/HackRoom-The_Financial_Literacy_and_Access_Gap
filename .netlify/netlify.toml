@@ -1,0 +1,68 @@
+headersOrigin = "config"
+redirectsOrigin = "config"
+plugins = []
+functionsDirectory = "E:\\HackWave\\frontend\\netlify\\functions"
+functionsDirectoryOrigin = "config"
+
+[functions]
+
+[functions."*"]
+node_bundler = "esbuild"
+
+[build]
+publish = "E:\\HackWave\\frontend\\frontend\\build"
+publishOrigin = "config"
+commandOrigin = "config"
+command = "npm run build"
+base = "E:\\HackWave\\frontend"
+functions = "E:\\HackWave\\frontend\\netlify\\functions"
+
+[build.environment]
+NODE_VERSION = "18"
+NPM_FLAGS = "--production=false"
+NODE_ENV = "production"
+
+[build.processing]
+
+[build.processing.css]
+
+[build.processing.html]
+
+[build.processing.images]
+
+[build.processing.js]
+
+[build.services]
+
+[[headers]]
+for = "/*"
+
+[headers.values]
+X-Frame-Options = "DENY"
+X-XSS-Protection = "1; mode=block"
+X-Content-Type-Options = "nosniff"
+Referrer-Policy = "strict-origin-when-cross-origin"
+
+[[redirects]]
+from = "/api/*"
+to = "/.netlify/functions/:splat"
+status = 200.0
+force = false
+
+[redirects.query]
+
+[redirects.conditions]
+
+[redirects.headers]
+
+[[redirects]]
+from = "/*"
+to = "/index.html"
+status = 200.0
+force = false
+
+[redirects.query]
+
+[redirects.conditions]
+
+[redirects.headers]
