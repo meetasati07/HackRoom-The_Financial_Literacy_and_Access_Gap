@@ -22,13 +22,22 @@ healthRoutes.get('/health', (req, res) => {
   });
 });
 
-// Basic auth routes
+// Auth routes - Register with actual Netlify paths
 authRoutes.post('/register', async (req, res) => {
   try {
     console.log('📝 Registration attempt:', req.body.email);
+
+    // Check if MongoDB is connected
+    if (!process.env.MONGODB_URI) {
+      return res.status(500).json({
+        success: false,
+        message: 'MongoDB connection string not configured'
+      });
+    }
+
     res.status(501).json({
       success: false,
-      message: 'Registration endpoint needs backend compilation to be fixed'
+      message: 'Registration endpoint needs MongoDB connection and backend compilation to be fixed'
     });
   } catch (error) {
     console.error('Registration error:', error);
@@ -49,18 +58,25 @@ authRoutes.post('/login', async (req, res) => {
   }
 });
 
-// Import backend modules if available, otherwise use fallbacks
-let connectDB;
-try {
-  const dbModule = require('../../backend/dist/config/database');
-  connectDB = dbModule.connectDB;
-  console.log('✅ Database module loaded');
-} catch (error) {
-  console.log('⚠️ Database module not available, using fallback');
-  connectDB = async () => {
-    console.log('🔄 Database connection skipped');
-  };
-}
+// User routes - Register with actual Netlify paths
+userRoutes.get('/profile', async (req, res) => {
+  try {
+    console.log('👤 Profile request');
+    res.status(501).json({
+      success: false,
+      message: 'Profile endpoint needs authentication and backend compilation to be fixed'
+    });
+  } catch (error) {
+    console.error('Profile error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// API routes - Use full paths for Netlify serverless functions
+app.use('/.netlify/functions/api/auth', authRoutes);
+app.use('/.netlify/functions/api/users', userRoutes);
+app.use('/.netlify/functions/api/financial', financialRoutes);
+app.use('/.netlify/functions/api/transactions', transactionRoutes);
 
 // Create Express app
 const app = express();
@@ -91,7 +107,6 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
-
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -122,11 +137,11 @@ app.get('/health', (req, res) => {
   });
 });
 
-// API routes
-app.use('/auth', authRoutes);
-app.use('/users', userRoutes);
-app.use('/financial', financialRoutes);
-app.use('/transactions', transactionRoutes);
+// API routes - Use full paths for Netlify serverless functions
+app.use('/.netlify/functions/api/auth', authRoutes);
+app.use('/.netlify/functions/api/users', userRoutes);
+app.use('/.netlify/functions/api/financial', financialRoutes);
+app.use('/.netlify/functions/api/transactions', transactionRoutes);
 
 // Error handling middleware
 app.use((req, res) => {
