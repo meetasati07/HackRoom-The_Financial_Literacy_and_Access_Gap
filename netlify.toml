@@ -1,7 +1,7 @@
 [build]
   base = "frontend"
   publish = "build"
-  command = "npm ci && npm run build"
+  command = "npm ci --include=dev && cd ../backend && npm ci && npm run build && cd ../frontend && npm ci --include=dev && npm run build && cd ../netlify/functions && npm install"
 
 # Deploy from master branch
 [context.production]
@@ -9,6 +9,7 @@
 
 [build.environment]
   NODE_VERSION = "18"
+  NPM_FLAGS = "--include=dev"
 
 # Serverless functions configuration
 [functions]
@@ -38,6 +39,12 @@
 # Environment variables (will be set in Netlify dashboard)
 [context.production.environment]
   NODE_ENV = "production"
+  # IMPORTANT: Set these sensitive values in Netlify dashboard, NOT in this file:
+  # - MONGODB_URI (your MongoDB Atlas connection string)
+  # - JWT_SECRET (32+ character secret key)
+  # - JWT_REFRESH_SECRET (different 32+ character secret key)
+  # - FRONTEND_URL (your actual Netlify domain)
+  # - CORS_ORIGIN (your actual Netlify domain)
   
 [context.deploy-preview.environment]
   NODE_ENV = "development"

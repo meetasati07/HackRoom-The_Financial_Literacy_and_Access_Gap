@@ -6,12 +6,12 @@ const cookieParser = require('cookie-parser');
 const serverless = require('serverless-http');
 
 // Import backend modules
-const { connectDB } = require('../../backend/src/config/database');
-const authRoutes = require('../../backend/src/routes/auth');
-const userRoutes = require('../../backend/src/routes/user');
-const financialRoutes = require('../../backend/src/routes/financial');
-const transactionRoutes = require('../../backend/src/routes/transactions');
-const { errorHandler, notFound } = require('../../backend/src/middleware/errorHandler');
+const { connectDB } = require('../../backend/dist/config/database');
+const authRoutes = require('../../backend/dist/routes/auth');
+const userRoutes = require('../../backend/dist/routes/user');
+const financialRoutes = require('../../backend/dist/routes/financial');
+const transactionRoutes = require('../../backend/dist/routes/transactions');
+const { errorHandler, notFound } = require('../../backend/dist/middleware/errorHandler');
 
 // Create Express app
 const app = express();
