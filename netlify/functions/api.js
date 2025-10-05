@@ -37,13 +37,35 @@ try {
 // Auth routes - Register with multiple path patterns for flexibility
 authRoutes.post('/register', async (req, res) => {
   try {
-    console.log('📝 Registration attempt:', req.body.email);
+    console.log('📝 Registration attempt - full request body:', JSON.stringify(req.body));
+    console.log('📝 Registration attempt - email field:', req.body?.email);
 
     // Check if MongoDB is connected
     if (!process.env.MONGODB_URI) {
       return res.status(500).json({
         success: false,
         message: 'MongoDB connection string not configured'
+      });
+    }
+
+    // Validate request body
+    if (!req.body) {
+      console.error('❌ Request body is missing');
+      return res.status(400).json({
+        success: false,
+        message: 'Request body is required'
+      });
+    }
+
+    const { name, mobile, email, password } = req.body;
+
+    // Validate required fields
+    if (!name || !mobile || !email || !password) {
+      console.error('❌ Missing required fields:', { name: !!name, mobile: !!mobile, email: !!email, password: !!password });
+      return res.status(400).json({
+        success: false,
+        message: 'All fields (name, mobile, email, password) are required',
+        received: { name, mobile, email, password: password ? '[HIDDEN]' : undefined }
       });
     }
 
@@ -135,7 +157,8 @@ authRoutes.post('/register', async (req, res) => {
 
 authRoutes.post('/login', async (req, res) => {
   try {
-    console.log('🔐 Login attempt:', req.body.identifier);
+    console.log('🔐 Login attempt - full request body:', JSON.stringify(req.body));
+    console.log('🔐 Login attempt - identifier field:', req.body?.identifier);
 
     if (!process.env.MONGODB_URI) {
       return res.status(500).json({
@@ -144,28 +167,39 @@ authRoutes.post('/login', async (req, res) => {
       });
     }
 
+    // Validate request body
+    if (!req.body) {
+      console.error('❌ Login request body is missing');
+      return res.status(400).json({
+        success: false,
+        message: 'Request body is required'
+      });
+    }
+
+    const { identifier, password } = req.body;
+
+    // Validate required fields
+    if (!identifier || !password) {
+      console.error('❌ Login missing required fields:', { identifier: !!identifier, password: !!password });
+      return res.status(400).json({
+        success: false,
+        message: 'Both identifier (email/mobile) and password are required',
+        received: { identifier, password: password ? '[HIDDEN]' : undefined }
+      });
+    }
+
     try {
       const mongoose = require('mongoose');
       const bcrypt = require('bcryptjs');
       const jwt = require('jsonwebtoken');
 
-      // Use existing User model if available
-      let User;
-      try {
-        User = mongoose.models.User || mongoose.model('User', require('mongoose').Schema({
-          name: String, mobile: String, email: String, password: String,
-          coins: Number, level: String, completedQuiz: Boolean, refreshTokens: [String]
-        }, { timestamps: true }));
-      } catch {
-        // Define schema if model doesn't exist
-        const userSchema = new mongoose.Schema({
-          name: String, mobile: String, email: String, password: String,
-          coins: Number, level: String, completedQuiz: Boolean, refreshTokens: [String]
-        }, { timestamps: true });
-        User = mongoose.model('User', userSchema);
-      }
+      // Define User schema if not exists
+      const userSchema = new mongoose.Schema({
+        name: String, mobile: String, email: String, password: String,
+        coins: Number, level: String, completedQuiz: Boolean, refreshTokens: [String]
+      }, { timestamps: true });
 
-      const { identifier, password } = req.body;
+      const User = mongoose.models.User || mongoose.model('User', userSchema);
 
       // Find user by mobile or email
       const user = await User.findOne({
