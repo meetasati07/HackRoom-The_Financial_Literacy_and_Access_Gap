@@ -89,8 +89,18 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
 
-// Health check endpoint
-app.use('/health', healthRoutes);
+// Health check endpoint - Direct route registration
+app.get('/health', (req, res) => {
+  console.log('✅ Health check accessed');
+  res.status(200).json({
+    status: 'OK',
+    message: 'HackWave API is running on Netlify',
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'production',
+  });
+});
+
+// API routes
 app.use('/auth', authRoutes);
 app.use('/users', userRoutes);
 app.use('/financial', financialRoutes);
