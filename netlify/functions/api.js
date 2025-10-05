@@ -60,6 +60,27 @@ authRoutes.post('/register', async (req, res) => {
           message: 'Invalid request body format'
         });
       }
+    } else if (body && typeof body === 'object' && !Array.isArray(body) && Object.keys(body).every(key => !isNaN(key))) {
+      // Handle object with numeric keys (like {0: 123, 1: 34, 2: 110, ...})
+      console.log('📝 Body is object with numeric keys, extracting values...');
+      try {
+        // Extract values in order and convert to string
+        const values = Object.keys(body)
+          .sort((a, b) => parseInt(a) - parseInt(b))
+          .map(key => body[key]);
+        const jsonString = String.fromCharCode(...values);
+        console.log('📝 Object values as string:', jsonString);
+        body = JSON.parse(jsonString);
+        console.log('📝 Successfully parsed object body:', JSON.stringify(body));
+      } catch (parseError) {
+        console.error('❌ Object parsing failed:', parseError);
+        console.error('❌ Object keys:', Object.keys(body));
+        console.error('❌ Object values:', Object.values(body));
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid request body format'
+        });
+      }
     } else if (body && body.type === 'Buffer' && body.data) {
       console.log('📝 Parsing Buffer body...');
       try {
@@ -230,6 +251,27 @@ authRoutes.post('/login', async (req, res) => {
         console.log('🔐 Successfully parsed array body:', JSON.stringify(body));
       } catch (parseError) {
         console.error('❌ Login Array parsing failed:', parseError);
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid request body format'
+        });
+      }
+    } else if (body && typeof body === 'object' && !Array.isArray(body) && Object.keys(body).every(key => !isNaN(key))) {
+      // Handle object with numeric keys (like {0: 123, 1: 34, 2: 110, ...})
+      console.log('🔐 Body is object with numeric keys, extracting values...');
+      try {
+        // Extract values in order and convert to string
+        const values = Object.keys(body)
+          .sort((a, b) => parseInt(a) - parseInt(b))
+          .map(key => body[key]);
+        const jsonString = String.fromCharCode(...values);
+        console.log('🔐 Object values as string:', jsonString);
+        body = JSON.parse(jsonString);
+        console.log('🔐 Successfully parsed object body:', JSON.stringify(body));
+      } catch (parseError) {
+        console.error('❌ Login Object parsing failed:', parseError);
+        console.error('❌ Object keys:', Object.keys(body));
+        console.error('❌ Object values:', Object.values(body));
         return res.status(400).json({
           success: false,
           message: 'Invalid request body format'
