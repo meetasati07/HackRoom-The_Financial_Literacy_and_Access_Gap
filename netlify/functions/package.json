@@ -18,6 +18,9 @@
     "express-validator": "^7.2.1",
     "express-rate-limit": "^7.1.5",
     "dotenv": "^16.3.1",
-    "razorpay": "^2.9.2"
+    "razorpay": "^2.9.6",
+    "mongodb": "^6.20.0",
+    "typescript": "^5.3.2",
+    "ts-node": "^10.9.1"
   }
 }
