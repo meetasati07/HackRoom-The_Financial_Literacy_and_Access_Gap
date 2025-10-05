@@ -24,16 +24,40 @@ try {
   transactionRoutes = transactionModule.default;
   errorHandler = errorModule.errorHandler;
   notFound = errorModule.notFound;
+
+  console.log('✅ Backend modules imported successfully');
 } catch (error) {
-  console.log('Compiled backend not found, this is expected during build. Backend will be available at runtime.');
+  console.error('❌ Failed to import backend modules:', error.message);
+  console.log('This may indicate backend compilation issues');
+
   // Provide fallback for build time - these will be replaced at runtime
-  connectDB = async () => {};
-  authRoutes = (req, res, next) => next();
-  userRoutes = (req, res, next) => next();
-  financialRoutes = (req, res, next) => next();
-  transactionRoutes = (req, res, next) => next();
-  errorHandler = (err, req, res, next) => res.status(500).json({ error: 'Server error' });
-  notFound = (req, res) => res.status(404).json({ error: 'Not found' });
+  connectDB = async () => {
+    console.log('🔄 Using fallback database connection');
+  };
+  authRoutes = (req, res, next) => {
+    console.log('❌ Auth routes not available');
+    res.status(404).json({ error: 'Auth routes not available' });
+  };
+  userRoutes = (req, res, next) => {
+    console.log('❌ User routes not available');
+    res.status(404).json({ error: 'User routes not available' });
+  };
+  financialRoutes = (req, res, next) => {
+    console.log('❌ Financial routes not available');
+    res.status(404).json({ error: 'Financial routes not available' });
+  };
+  transactionRoutes = (req, res, next) => {
+    console.log('❌ Transaction routes not available');
+    res.status(404).json({ error: 'Transaction routes not available' });
+  };
+  errorHandler = (err, req, res, next) => {
+    console.error('❌ Error handler not available:', err);
+    res.status(500).json({ error: 'Server error' });
+  };
+  notFound = (req, res) => {
+    console.log('❌ Route not found:', req.originalUrl);
+    res.status(404).json({ error: 'Not found' });
+  };
 }
 
 // Create Express app
