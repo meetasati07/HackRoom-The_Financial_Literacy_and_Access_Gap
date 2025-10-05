@@ -40,14 +40,42 @@ authRoutes.post('/register', async (req, res) => {
     // Handle serverless function body parsing
     let body = req.body;
 
+    // Debug: Log the raw body structure
+    console.log('📝 Raw body type:', typeof body);
+    console.log('📝 Raw body keys:', body ? Object.keys(body) : 'null');
+    console.log('📝 Raw body structure:', JSON.stringify(body, null, 2));
+
     // If body is a Buffer (serverless function), parse it
-    if (body && body.type === 'Buffer') {
+    if (body && body.type === 'Buffer' && body.data) {
       console.log('📝 Parsing Buffer body...');
-      body = JSON.parse(body.data.toString());
-      console.log('📝 Parsed body:', JSON.stringify(body));
+      try {
+        const jsonString = Buffer.from(body.data).toString('utf8');
+        console.log('📝 Buffer as string:', jsonString);
+        body = JSON.parse(jsonString);
+        console.log('📝 Successfully parsed body:', JSON.stringify(body));
+      } catch (parseError) {
+        console.error('❌ Buffer parsing failed:', parseError);
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid request body format'
+        });
+      }
+    } else if (body && typeof body === 'string') {
+      // If body is already a string, parse it
+      console.log('📝 Parsing string body...');
+      try {
+        body = JSON.parse(body);
+        console.log('📝 Parsed string body:', JSON.stringify(body));
+      } catch (parseError) {
+        console.error('❌ String parsing failed:', parseError);
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid JSON in request body'
+        });
+      }
     }
 
-    console.log('📝 Registration attempt - parsed body:', JSON.stringify(body));
+    console.log('📝 Final parsed body:', JSON.stringify(body));
     console.log('📝 Registration attempt - email field:', body?.email);
 
     // Check if MongoDB is connected
@@ -173,14 +201,41 @@ authRoutes.post('/login', async (req, res) => {
     // Handle serverless function body parsing
     let body = req.body;
 
+    // Debug: Log the raw body structure
+    console.log('🔐 Raw body type:', typeof body);
+    console.log('🔐 Raw body keys:', body ? Object.keys(body) : 'null');
+
     // If body is a Buffer (serverless function), parse it
-    if (body && body.type === 'Buffer') {
+    if (body && body.type === 'Buffer' && body.data) {
       console.log('🔐 Parsing Buffer body for login...');
-      body = JSON.parse(body.data.toString());
-      console.log('🔐 Parsed login body:', JSON.stringify(body));
+      try {
+        const jsonString = Buffer.from(body.data).toString('utf8');
+        console.log('🔐 Buffer as string:', jsonString);
+        body = JSON.parse(jsonString);
+        console.log('🔐 Successfully parsed login body:', JSON.stringify(body));
+      } catch (parseError) {
+        console.error('❌ Login Buffer parsing failed:', parseError);
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid request body format'
+        });
+      }
+    } else if (body && typeof body === 'string') {
+      // If body is already a string, parse it
+      console.log('🔐 Parsing string body for login...');
+      try {
+        body = JSON.parse(body);
+        console.log('🔐 Parsed string login body:', JSON.stringify(body));
+      } catch (parseError) {
+        console.error('❌ Login string parsing failed:', parseError);
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid JSON in request body'
+        });
+      }
     }
 
-    console.log('🔐 Login attempt - parsed body:', JSON.stringify(body));
+    console.log('🔐 Final parsed login body:', JSON.stringify(body));
     console.log('🔐 Login attempt - identifier field:', body?.identifier);
 
     if (!process.env.MONGODB_URI) {
