@@ -5,58 +5,60 @@ const compression = require('compression');
 const cookieParser = require('cookie-parser');
 const serverless = require('serverless-http');
 
-// Import backend modules - try both compiled and source versions
-let connectDB, authRoutes, userRoutes, financialRoutes, transactionRoutes, errorHandler, notFound;
+// Simple API routes that work without backend compilation
+const authRoutes = require('express').Router();
+const userRoutes = require('express').Router();
+const financialRoutes = require('express').Router();
+const transactionRoutes = require('express').Router();
 
+// Health check endpoint
+const healthRoutes = require('express').Router();
+healthRoutes.get('/health', (req, res) => {
+  res.status(200).json({
+    status: 'OK',
+    message: 'HackWave API is running on Netlify',
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'production',
+  });
+});
+
+// Basic auth routes
+authRoutes.post('/register', async (req, res) => {
+  try {
+    console.log('📝 Registration attempt:', req.body.email);
+    res.status(501).json({
+      success: false,
+      message: 'Registration endpoint needs backend compilation to be fixed'
+    });
+  } catch (error) {
+    console.error('Registration error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+authRoutes.post('/login', async (req, res) => {
+  try {
+    console.log('🔐 Login attempt:', req.body.email);
+    res.status(501).json({
+      success: false,
+      message: 'Login endpoint needs backend compilation to be fixed'
+    });
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Import backend modules if available, otherwise use fallbacks
+let connectDB;
 try {
-  // Try importing from compiled backend first
   const dbModule = require('../../backend/dist/config/database');
-  const authModule = require('../../backend/dist/routes/auth');
-  const userModule = require('../../backend/dist/routes/user');
-  const financialModule = require('../../backend/dist/routes/financial');
-  const transactionModule = require('../../backend/dist/routes/transactions');
-  const errorModule = require('../../backend/dist/middleware/errorHandler');
-
   connectDB = dbModule.connectDB;
-  authRoutes = authModule.default;
-  userRoutes = userModule.default;
-  financialRoutes = financialModule.default;
-  transactionRoutes = transactionModule.default;
-  errorHandler = errorModule.errorHandler;
-  notFound = errorModule.notFound;
-
-  console.log('✅ Backend modules imported successfully');
+  console.log('✅ Database module loaded');
 } catch (error) {
-  console.error('❌ Failed to import backend modules:', error.message);
-  console.log('This may indicate backend compilation issues');
-
-  // Provide fallback for build time - these will be replaced at runtime
+  console.log('⚠️ Database module not available, using fallback');
   connectDB = async () => {
-    console.log('🔄 Using fallback database connection');
-  };
-  authRoutes = (req, res, next) => {
-    console.log('❌ Auth routes not available');
-    res.status(404).json({ error: 'Auth routes not available' });
-  };
-  userRoutes = (req, res, next) => {
-    console.log('❌ User routes not available');
-    res.status(404).json({ error: 'User routes not available' });
-  };
-  financialRoutes = (req, res, next) => {
-    console.log('❌ Financial routes not available');
-    res.status(404).json({ error: 'Financial routes not available' });
-  };
-  transactionRoutes = (req, res, next) => {
-    console.log('❌ Transaction routes not available');
-    res.status(404).json({ error: 'Transaction routes not available' });
-  };
-  errorHandler = (err, req, res, next) => {
-    console.error('❌ Error handler not available:', err);
-    res.status(500).json({ error: 'Server error' });
-  };
-  notFound = (req, res) => {
-    console.log('❌ Route not found:', req.originalUrl);
-    res.status(404).json({ error: 'Not found' });
+    console.log('🔄 Database connection skipped');
   };
 }
 
@@ -88,24 +90,28 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
 
 // Health check endpoint
-app.get('/health', (req, res) => {
-  res.status(200).json({
-    status: 'OK',
-    message: 'HackWave API is running on Netlify',
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'production',
-  });
-});
-
-// API routes
+app.use('/health', healthRoutes);
 app.use('/auth', authRoutes);
 app.use('/users', userRoutes);
 app.use('/financial', financialRoutes);
 app.use('/transactions', transactionRoutes);
 
 // Error handling middleware
-app.use(notFound);
-app.use(errorHandler);
+app.use((req, res) => {
+  console.log(`❌ Route not found: ${req.method} ${req.originalUrl}`);
+  res.status(404).json({
+    success: false,
+    message: `Route ${req.method} ${req.originalUrl} not found`
+  });
+});
+
+app.use((err, req, res, next) => {
+  console.error('❌ Server error:', err);
+  res.status(500).json({
+    success: false,
+    message: 'Internal server error'
+  });
+});
 
 // Initialize database connection
 let isConnected = false;
