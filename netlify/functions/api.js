@@ -413,15 +413,267 @@ authRoutes.post('/login', async (req, res) => {
 userRoutes.get('/profile', async (req, res) => {
   try {
     console.log('👤 Profile request');
-    res.status(501).json({
-      success: false,
-      message: 'Profile endpoint needs authentication and backend compilation to be fixed'
-    });
+
+    // Check for authorization header
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authorization token required'
+      });
+    }
+
+    const token = authHeader.substring(7);
+    const jwt = require('jsonwebtoken');
+
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret');
+      console.log('✅ Token verified for user:', decoded.mobile);
+
+      if (!process.env.MONGODB_URI) {
+        return res.status(500).json({
+          success: false,
+          message: 'Database not configured'
+        });
+      }
+
+      const mongoose = require('mongoose');
+      const User = mongoose.models.User || mongoose.model('User', new mongoose.Schema({
+        name: String, mobile: String, email: String, password: String,
+        coins: Number, level: String, completedQuiz: Boolean, refreshTokens: [String]
+      }, { timestamps: true }));
+
+      const user = await User.findById(decoded.userId);
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: 'User not found'
+        });
+      }
+
+      res.json({
+        success: true,
+        data: {
+          user: {
+            id: user._id,
+            name: user.name,
+            mobile: user.mobile,
+            email: user.email,
+            coins: user.coins,
+            level: user.level,
+            completedQuiz: user.completedQuiz,
+          }
+        }
+      });
+
+    } catch (tokenError) {
+      console.error('Token verification failed:', tokenError);
+      res.status(401).json({
+        success: false,
+        message: 'Invalid or expired token'
+      });
+    }
+
   } catch (error) {
     console.error('Profile error:', error);
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
+
+// Auth routes - Get current user
+authRoutes.get('/me', async (req, res) => {
+  try {
+    console.log('🔐 Get current user request');
+
+    // Check for authorization header
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authorization token required'
+      });
+    }
+
+    const token = authHeader.substring(7);
+    const jwt = require('jsonwebtoken');
+
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret');
+      console.log('✅ Token verified for user:', decoded.mobile);
+
+      if (!process.env.MONGODB_URI) {
+        return res.status(500).json({
+          success: false,
+          message: 'Database not configured'
+        });
+      }
+
+      const mongoose = require('mongoose');
+      const User = mongoose.models.User || mongoose.model('User', new mongoose.Schema({
+        name: String, mobile: String, email: String, password: String,
+        coins: Number, level: String, completedQuiz: Boolean, refreshTokens: [String]
+      }, { timestamps: true }));
+
+      const user = await User.findById(decoded.userId);
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: 'User not found'
+        });
+      }
+
+      res.json({
+        success: true,
+        data: {
+          user: {
+            id: user._id,
+            name: user.name,
+            mobile: user.mobile,
+            email: user.email,
+            coins: user.coins,
+            level: user.level,
+            completedQuiz: user.completedQuiz,
+          }
+        }
+      });
+
+    } catch (tokenError) {
+      console.error('Token verification failed:', tokenError);
+      res.status(401).json({
+        success: false,
+        message: 'Invalid or expired token'
+      });
+    }
+
+  } catch (error) {
+    console.error('Get current user error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// User routes - Complete quiz
+userRoutes.post('/complete-quiz', async (req, res) => {
+  try {
+    console.log('🎯 Complete quiz request');
+
+    // Check for authorization header
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authorization token required'
+      });
+    }
+
+    const token = authHeader.substring(7);
+    const jwt = require('jsonwebtoken');
+
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret');
+      console.log('✅ Token verified for user:', decoded.mobile);
+
+      if (!process.env.MONGODB_URI) {
+        return res.status(500).json({
+          success: false,
+          message: 'Database not configured'
+        });
+      }
+
+      const mongoose = require('mongoose');
+      const User = mongoose.models.User || mongoose.model('User', new mongoose.Schema({
+        name: String, mobile: String, email: String, password: String,
+        coins: Number, level: String, completedQuiz: Boolean, refreshTokens: [String]
+      }, { timestamps: true }));
+
+      const user = await User.findById(decoded.userId);
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: 'User not found'
+        });
+      }
+
+      // Update user quiz completion status
+      user.completedQuiz = true;
+      user.coins = (user.coins || 0) + 100; // Add 100 coins for completing quiz
+      await user.save();
+
+      res.json({
+        success: true,
+        message: 'Quiz completed successfully!',
+        data: {
+          user: {
+            id: user._id,
+            name: user.name,
+            mobile: user.mobile,
+            email: user.email,
+            coins: user.coins,
+            level: user.level,
+            completedQuiz: user.completedQuiz,
+          }
+        }
+      });
+
+    } catch (tokenError) {
+      console.error('Token verification failed:', tokenError);
+      res.status(401).json({
+        success: false,
+        message: 'Invalid or expired token'
+      });
+    }
+
+  } catch (error) {
+    console.error('Complete quiz error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Stats routes - Platform statistics
+const statsRoutes = require('express').Router();
+statsRoutes.get('/platform', async (req, res) => {
+  try {
+    console.log('📊 Platform stats request');
+
+    if (!process.env.MONGODB_URI) {
+      return res.status(500).json({
+        success: false,
+        message: 'Database not configured'
+      });
+    }
+
+    const mongoose = require('mongoose');
+    const User = mongoose.models.User || mongoose.model('User', new mongoose.Schema({
+      name: String, mobile: String, email: String, password: String,
+      coins: Number, level: String, completedQuiz: Boolean, refreshTokens: [String]
+    }, { timestamps: true }));
+
+    // Get platform statistics
+    const totalUsers = await User.countDocuments();
+    const quizCompletedUsers = await User.countDocuments({ completedQuiz: true });
+    const totalCoinsDistributed = await User.aggregate([
+      { $group: { _id: null, total: { $sum: '$coins' } } }
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        stats: {
+          totalUsers,
+          quizCompletedUsers,
+          totalCoinsDistributed: totalCoinsDistributed[0]?.total || 0,
+          completionRate: totalUsers > 0 ? (quizCompletedUsers / totalUsers * 100).toFixed(1) : 0
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Platform stats error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Register stats routes
+app.use('/.netlify/functions/api/stats', statsRoutes);
 
 // API routes - Register with multiple path patterns
 app.use('/.netlify/functions/api/auth', authRoutes);
