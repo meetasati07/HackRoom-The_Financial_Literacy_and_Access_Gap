@@ -2,6 +2,10 @@
   publish = "frontend/build"
   command = "cd frontend && npm ci && npm run build"
 
+# Deploy from master branch
+[context.production]
+  branch = "master"
+
 [build.environment]
   NODE_VERSION = "18"
 
