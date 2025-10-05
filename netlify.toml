@@ -1,7 +1,7 @@
 [build]
   base = "frontend"
   publish = "build"
-  command = "npm ci --include=dev && cd ../backend && npm ci && npm run build && cd ../frontend && npm ci --include=dev && npm run build && cd ../netlify/functions && npm install"
+  command = "npm ci --include=dev && cd ../backend && npm ci --include=dev && npm run build && cd ../frontend && npm ci --include=dev && npm run build && cd ../netlify/functions && npm install"
 
 # Deploy from master branch
 [context.production]
