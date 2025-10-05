@@ -43,10 +43,24 @@ authRoutes.post('/register', async (req, res) => {
     // Debug: Log the raw body structure
     console.log('📝 Raw body type:', typeof body);
     console.log('📝 Raw body keys:', body ? Object.keys(body) : 'null');
-    console.log('📝 Raw body structure:', JSON.stringify(body, null, 2));
 
-    // If body is a Buffer (serverless function), parse it
-    if (body && body.type === 'Buffer' && body.data) {
+    // Handle different body formats in serverless functions
+    if (body && Array.isArray(body)) {
+      console.log('📝 Body is array, converting to string...');
+      try {
+        // Convert array of byte values to string
+        const jsonString = String.fromCharCode(...body);
+        console.log('📝 Array as string:', jsonString);
+        body = JSON.parse(jsonString);
+        console.log('📝 Successfully parsed array body:', JSON.stringify(body));
+      } catch (parseError) {
+        console.error('❌ Array parsing failed:', parseError);
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid request body format'
+        });
+      }
+    } else if (body && body.type === 'Buffer' && body.data) {
       console.log('📝 Parsing Buffer body...');
       try {
         const jsonString = Buffer.from(body.data).toString('utf8');
@@ -205,8 +219,23 @@ authRoutes.post('/login', async (req, res) => {
     console.log('🔐 Raw body type:', typeof body);
     console.log('🔐 Raw body keys:', body ? Object.keys(body) : 'null');
 
-    // If body is a Buffer (serverless function), parse it
-    if (body && body.type === 'Buffer' && body.data) {
+    // Handle different body formats in serverless functions
+    if (body && Array.isArray(body)) {
+      console.log('🔐 Body is array, converting to string...');
+      try {
+        // Convert array of byte values to string
+        const jsonString = String.fromCharCode(...body);
+        console.log('🔐 Array as string:', jsonString);
+        body = JSON.parse(jsonString);
+        console.log('🔐 Successfully parsed array body:', JSON.stringify(body));
+      } catch (parseError) {
+        console.error('❌ Login Array parsing failed:', parseError);
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid request body format'
+        });
+      }
+    } else if (body && body.type === 'Buffer' && body.data) {
       console.log('🔐 Parsing Buffer body for login...');
       try {
         const jsonString = Buffer.from(body.data).toString('utf8');
