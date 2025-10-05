@@ -4,25 +4,26 @@ const helmet = require('helmet');
 const compression = require('compression');
 const cookieParser = require('cookie-parser');
 const serverless = require('serverless-http');
-const connectDB = require('./db'); // <-- add this
 
 // Create Express app instance
 const app = express();
-const authRoutes = require('express').Router(); // <-- added
+const authRoutes = require('express').Router();
 const userRoutes = require('express').Router();
 const financialRoutes = require('express').Router();
 const transactionRoutes = require('express').Router();
 
-// Health check endpoint
-const healthRoutes = require('express').Router();
-healthRoutes.get('/health', (req, res) => {
-  res.status(200).json({
-    status: 'OK',
-    message: 'HackWave API is running on Netlify',
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'production',
-  });
-});
+// Import database connection with fallback
+let connectDB;
+try {
+  const dbModule = require('./db');
+  connectDB = dbModule.default || dbModule;
+  console.log('✅ Database module loaded from ./db');
+} catch (error) {
+  console.log('⚠️ Database module not found, using fallback');
+  connectDB = async () => {
+    console.log('🔄 Database connection skipped');
+  };
+}
 
 // Auth routes - Register with actual Netlify paths
 authRoutes.post('/register', async (req, res) => {
@@ -82,9 +83,14 @@ app.use((req, res, next) => {
   console.log(`🚀 Request received: ${req.method} ${req.originalUrl}`);
   console.log(`📍 Path: ${req.path}`);
   console.log(`🔍 Base URL: ${req.baseUrl}`);
-  console.log(`🔎 Request headers: ${JSON.stringify(req.headers)}`);
   next();
 });
+
+// Security middleware
+app.use(helmet({
+  contentSecurityPolicy: false, // Disable CSP for Netlify compatibility
+}));
+app.use(compression());
 
 // CORS configuration for production
 app.use(cors({
@@ -104,6 +110,7 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
 
+// Health check endpoint - Register with actual path Netlify sends
 app.get('/.netlify/functions/api/health', (req, res) => {
   console.log('✅ Health check accessed');
   res.status(200).json({
