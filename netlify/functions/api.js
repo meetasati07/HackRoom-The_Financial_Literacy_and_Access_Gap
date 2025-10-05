@@ -97,29 +97,28 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
 
-// Health check endpoint - Multiple ways to register
-app.get('/health', (req, res) => {
+// Health check endpoint - Register with actual path Netlify sends
+app.get('/.netlify/functions/api/health', (req, res) => {
   console.log('✅ Health check accessed');
   res.status(200).json({
     status: 'OK',
     message: 'HackWave API is running on Netlify',
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'production',
-    path: req.path,
-    baseUrl: req.baseUrl,
-    originalUrl: req.originalUrl
+    actualPath: req.path,
+    note: 'Fixed path for Netlify serverless functions'
   });
 });
 
-// Also register without leading slash (Netlify might strip it)
-app.get('health', (req, res) => {
-  console.log('✅ Health check accessed (no leading slash)');
+// Also keep the short path for direct access
+app.get('/health', (req, res) => {
+  console.log('✅ Health check accessed (short path)');
   res.status(200).json({
     status: 'OK',
     message: 'HackWave API is running on Netlify',
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'production',
-    note: 'Accessed without leading slash'
+    note: 'Short path access'
   });
 });
 
