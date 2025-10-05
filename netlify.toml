@@ -1,7 +1,7 @@
 [build]
   base = "frontend"
   publish = "build"
-  command = "npm ci --include=dev && cd ../backend && npm ci --include=dev && npx tsc && cd ../frontend && npm ci --include=dev && npm run build && cd ../netlify/functions && npm install"
+  command = "npm ci --include=dev && cd ../backend && npm ci --include=dev && echo 'Compiling backend...' && npx tsc --build && echo 'Backend compilation complete' && ls -la dist/ && cd ../frontend && npm ci --include=dev && npm run build && cd ../netlify/functions && npm install"
 
 # Deploy from master branch
 [context.production]
@@ -39,12 +39,14 @@
 # Environment variables (will be set in Netlify dashboard)
 [context.production.environment]
   NODE_ENV = "production"
-  # IMPORTANT: Set these sensitive values in Netlify dashboard, NOT in this file:
-  # - MONGODB_URI (your MongoDB Atlas connection string)
+  # CRITICAL: Fix your MongoDB Atlas connection string format
+  # - MONGODB_URI = mongodb+srv://username:password@cluster.mongodb.net/database?retryWrites=true&w=majority
+  # - Replace 'username' with your Atlas username
+  # - Replace 'password' with your Atlas password (URL-encode if it contains @)
+  # - Replace 'cluster' with your actual cluster name
+  # - Replace 'database' with your database name
   # - JWT_SECRET (32+ character secret key)
   # - JWT_REFRESH_SECRET (different 32+ character secret key)
-  # - RAZORPAY_KEY_ID (your Razorpay key ID)
-  # - RAZORPAY_KEY_SECRET (your Razorpay secret key)
   # - FRONTEND_URL (your actual Netlify domain)
   # - CORS_ORIGIN (your actual Netlify domain)
   
