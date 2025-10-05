@@ -1,7 +1,11 @@
 [build]
   base = "frontend"
   publish = "build"
-  command = "npm ci --include=dev && npm run build"
+  command = "npm ci --include=dev && npm run build && cd ../netlify/functions && npm ci"
+
+# Netlify plugins
+[[plugins]]
+  package = "@netlify/plugin-functions-install-core"
 
 # Deploy from master branch
 [context.production]
