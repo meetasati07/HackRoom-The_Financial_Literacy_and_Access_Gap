@@ -19,13 +19,12 @@ try {
   connectDB = dbModule.default || dbModule;
   console.log('✅ Database module loaded from ./db');
 } catch (error) {
-  console.log('⚠️ Database module not found, using fallback');
   connectDB = async () => {
     console.log('🔄 Database connection skipped');
   };
 }
 
-// Auth routes - Register with actual Netlify paths
+// Auth routes - Register with multiple path patterns for flexibility
 authRoutes.post('/register', async (req, res) => {
   try {
     console.log('📝 Registration attempt:', req.body.email);
@@ -75,40 +74,9 @@ userRoutes.get('/profile', async (req, res) => {
   }
 });
 
-// API routes - Use full paths for Netlify serverless functions
-// (These will be registered after Express app is created)
-
-// Add logging middleware first
-app.use((req, res, next) => {
-  console.log(`🚀 Request received: ${req.method} ${req.originalUrl}`);
-  console.log(`📍 Path: ${req.path}`);
-  console.log(`🔍 Base URL: ${req.baseUrl}`);
-  next();
-});
-
-// Security middleware
-app.use(helmet({
-  contentSecurityPolicy: false, // Disable CSP for Netlify compatibility
-}));
-app.use(compression());
-
-// CORS configuration for production
-app.use(cors({
-  origin: [
-    'https://hackroomfinlearn.netlify.app',
-    'http://localhost:3000',
-    'http://localhost:5173',
-    process.env.FRONTEND_URL || 'https://hackroomfinlearn.netlify.app'
-  ],
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-}));
-
-// Body parsing middleware
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-app.use(cookieParser());
+// API routes - Register with multiple path patterns
+app.use('/.netlify/functions/api/auth', authRoutes);
+app.use('/.netlify/functions/api', authRoutes); // For direct access to auth routes
 
 // Health check endpoint - Register with actual path Netlify sends
 app.get('/.netlify/functions/api/health', (req, res) => {
@@ -140,6 +108,9 @@ app.use('/.netlify/functions/api/auth', authRoutes);
 app.use('/.netlify/functions/api/users', userRoutes);
 app.use('/.netlify/functions/api/financial', financialRoutes);
 app.use('/.netlify/functions/api/transactions', transactionRoutes);
+
+// Also register auth routes at the root level for direct access
+app.use('/.netlify/functions/api', authRoutes);
 
 // Error handling middleware
 app.use((req, res) => {
