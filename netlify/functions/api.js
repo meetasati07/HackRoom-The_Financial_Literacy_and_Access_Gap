@@ -37,8 +37,18 @@ try {
 // Auth routes - Register with multiple path patterns for flexibility
 authRoutes.post('/register', async (req, res) => {
   try {
-    console.log('📝 Registration attempt - full request body:', JSON.stringify(req.body));
-    console.log('📝 Registration attempt - email field:', req.body?.email);
+    // Handle serverless function body parsing
+    let body = req.body;
+
+    // If body is a Buffer (serverless function), parse it
+    if (body && body.type === 'Buffer') {
+      console.log('📝 Parsing Buffer body...');
+      body = JSON.parse(body.data.toString());
+      console.log('📝 Parsed body:', JSON.stringify(body));
+    }
+
+    console.log('📝 Registration attempt - parsed body:', JSON.stringify(body));
+    console.log('📝 Registration attempt - email field:', body?.email);
 
     // Check if MongoDB is connected
     if (!process.env.MONGODB_URI) {
@@ -49,7 +59,7 @@ authRoutes.post('/register', async (req, res) => {
     }
 
     // Validate request body
-    if (!req.body) {
+    if (!body) {
       console.error('❌ Request body is missing');
       return res.status(400).json({
         success: false,
@@ -57,11 +67,16 @@ authRoutes.post('/register', async (req, res) => {
       });
     }
 
-    const { name, mobile, email, password } = req.body;
+    const { name, mobile, email, password } = body;
 
     // Validate required fields
     if (!name || !mobile || !email || !password) {
-      console.error('❌ Missing required fields:', { name: !!name, mobile: !!mobile, email: !!email, password: !!password });
+      console.error('❌ Missing required fields:', {
+        name: !!name,
+        mobile: !!mobile,
+        email: !!email,
+        password: !!password
+      });
       return res.status(400).json({
         success: false,
         message: 'All fields (name, mobile, email, password) are required',
@@ -96,8 +111,6 @@ authRoutes.post('/register', async (req, res) => {
       });
 
       const User = mongoose.models.User || mongoose.model('User', userSchema);
-
-      const { name, mobile, email, password } = req.body;
 
       // Check if user exists
       const existingUser = await User.findOne({
@@ -157,8 +170,18 @@ authRoutes.post('/register', async (req, res) => {
 
 authRoutes.post('/login', async (req, res) => {
   try {
-    console.log('🔐 Login attempt - full request body:', JSON.stringify(req.body));
-    console.log('🔐 Login attempt - identifier field:', req.body?.identifier);
+    // Handle serverless function body parsing
+    let body = req.body;
+
+    // If body is a Buffer (serverless function), parse it
+    if (body && body.type === 'Buffer') {
+      console.log('🔐 Parsing Buffer body for login...');
+      body = JSON.parse(body.data.toString());
+      console.log('🔐 Parsed login body:', JSON.stringify(body));
+    }
+
+    console.log('🔐 Login attempt - parsed body:', JSON.stringify(body));
+    console.log('🔐 Login attempt - identifier field:', body?.identifier);
 
     if (!process.env.MONGODB_URI) {
       return res.status(500).json({
@@ -168,7 +191,7 @@ authRoutes.post('/login', async (req, res) => {
     }
 
     // Validate request body
-    if (!req.body) {
+    if (!body) {
       console.error('❌ Login request body is missing');
       return res.status(400).json({
         success: false,
@@ -176,7 +199,7 @@ authRoutes.post('/login', async (req, res) => {
       });
     }
 
-    const { identifier, password } = req.body;
+    const { identifier, password } = body;
 
     // Validate required fields
     if (!identifier || !password) {
