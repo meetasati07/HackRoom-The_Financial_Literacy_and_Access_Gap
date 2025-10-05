@@ -15,13 +15,23 @@ const transactionRoutes = require('express').Router();
 // Import database connection with fallback
 let connectDB;
 try {
-  const dbModule = require('./db');
-  connectDB = dbModule.default || dbModule;
-  console.log('✅ Database module loaded from ./db');
+  // Try to load from compiled backend first
+  const dbModule = require('../../backend/dist/config/database');
+  connectDB = dbModule.connectDB;
+  console.log('✅ Database module loaded from compiled backend');
 } catch (error) {
-  connectDB = async () => {
-    console.log('🔄 Database connection skipped');
-  };
+  console.log('⚠️ Compiled backend not available, using fallback');
+  try {
+    // Try to load from source files
+    const dbModule = require('../../backend/src/config/database');
+    connectDB = dbModule.connectDB;
+    console.log('✅ Database module loaded from source files');
+  } catch (sourceError) {
+    console.log('⚠️ Source files not available, using minimal fallback');
+    connectDB = async () => {
+      console.log('🔄 Database connection skipped - configure MONGODB_URI to enable');
+    };
+  }
 }
 
 // Auth routes - Register with multiple path patterns for flexibility
@@ -37,10 +47,86 @@ authRoutes.post('/register', async (req, res) => {
       });
     }
 
-    res.status(501).json({
-      success: false,
-      message: 'Registration endpoint needs MongoDB connection and backend compilation to be fixed'
-    });
+    // Try to load and use the actual registration logic
+    try {
+      const mongoose = require('mongoose');
+
+      // Define a simple User schema for serverless function
+      const userSchema = new mongoose.Schema({
+        name: { type: String, required: true },
+        mobile: { type: String, required: true, unique: true },
+        email: { type: String, required: true, unique: true },
+        password: { type: String, required: true },
+        coins: { type: Number, default: 0 },
+        level: { type: String, default: 'Beginner' },
+        completedQuiz: { type: Boolean, default: false },
+        refreshTokens: [{ type: String }],
+      }, { timestamps: true });
+
+      // Hash password before saving (simple implementation)
+      userSchema.pre('save', async function(next) {
+        if (this.isModified('password')) {
+          const bcrypt = require('bcryptjs');
+          const salt = await bcrypt.genSalt(10);
+          this.password = await bcrypt.hash(this.password, salt);
+        }
+        next();
+      });
+
+      const User = mongoose.models.User || mongoose.model('User', userSchema);
+
+      const { name, mobile, email, password } = req.body;
+
+      // Check if user exists
+      const existingUser = await User.findOne({
+        $or: [{ mobile }, { email }]
+      });
+
+      if (existingUser) {
+        return res.status(400).json({
+          success: false,
+          message: existingUser.mobile === mobile
+            ? 'Mobile number already registered'
+            : 'Email already registered'
+        });
+      }
+
+      // Create new user
+      const user = new User({ name, mobile, email, password });
+      await user.save();
+
+      // Generate simple token (you'll want to use proper JWT in production)
+      const jwt = require('jsonwebtoken');
+      const token = jwt.sign(
+        { userId: user._id, mobile: user.mobile },
+        process.env.JWT_SECRET || 'fallback-secret',
+        { expiresIn: '7d' }
+      );
+
+      res.status(201).json({
+        success: true,
+        message: 'User registered successfully',
+        data: {
+          user: {
+            id: user._id,
+            name: user.name,
+            mobile: user.mobile,
+            email: user.email,
+            coins: user.coins,
+            level: user.level,
+          },
+          token,
+        },
+      });
+
+    } catch (dbError) {
+      console.error('Database operation failed:', dbError);
+      res.status(500).json({
+        success: false,
+        message: 'Registration failed - database error'
+      });
+    }
+
   } catch (error) {
     console.error('Registration error:', error);
     res.status(500).json({ success: false, message: 'Server error' });
@@ -49,11 +135,91 @@ authRoutes.post('/register', async (req, res) => {
 
 authRoutes.post('/login', async (req, res) => {
   try {
-    console.log('🔐 Login attempt:', req.body.email);
-    res.status(501).json({
-      success: false,
-      message: 'Login endpoint needs backend compilation to be fixed'
-    });
+    console.log('🔐 Login attempt:', req.body.identifier);
+
+    if (!process.env.MONGODB_URI) {
+      return res.status(500).json({
+        success: false,
+        message: 'MongoDB connection string not configured'
+      });
+    }
+
+    try {
+      const mongoose = require('mongoose');
+      const bcrypt = require('bcryptjs');
+      const jwt = require('jsonwebtoken');
+
+      // Use existing User model if available
+      let User;
+      try {
+        User = mongoose.models.User || mongoose.model('User', require('mongoose').Schema({
+          name: String, mobile: String, email: String, password: String,
+          coins: Number, level: String, completedQuiz: Boolean, refreshTokens: [String]
+        }, { timestamps: true }));
+      } catch {
+        // Define schema if model doesn't exist
+        const userSchema = new mongoose.Schema({
+          name: String, mobile: String, email: String, password: String,
+          coins: Number, level: String, completedQuiz: Boolean, refreshTokens: [String]
+        }, { timestamps: true });
+        User = mongoose.model('User', userSchema);
+      }
+
+      const { identifier, password } = req.body;
+
+      // Find user by mobile or email
+      const user = await User.findOne({
+        $or: [{ mobile: identifier }, { email: identifier }]
+      });
+
+      if (!user) {
+        return res.status(401).json({
+          success: false,
+          message: 'Invalid credentials'
+        });
+      }
+
+      // Check password
+      const isMatch = await bcrypt.compare(password, user.password);
+      if (!isMatch) {
+        return res.status(401).json({
+          success: false,
+          message: 'Invalid credentials'
+        });
+      }
+
+      // Generate token
+      const token = jwt.sign(
+        { userId: user._id, mobile: user.mobile },
+        process.env.JWT_SECRET || 'fallback-secret',
+        { expiresIn: '7d' }
+      );
+
+      res.json({
+        success: true,
+        message: 'Login successful',
+        data: {
+          user: {
+            id: user._id,
+            name: user.name,
+            mobile: user.mobile,
+            email: user.email,
+            coins: user.coins,
+            level: user.level,
+            completedQuiz: user.completedQuiz,
+          },
+          token,
+        },
+      });
+
+    } catch (dbError) {
+      console.error('Login database error:', dbError);
+      res.status(500).json({
+        success: false,
+        message: 'Login failed - database error'
+      });
+    }
+
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({ success: false, message: 'Server error' });
@@ -131,13 +297,16 @@ app.use((err, req, res, next) => {
 
 // Initialize database connection
 let isConnected = false;
+let mongooseConnection = null;
 
 const initializeDatabase = async () => {
-  if (!isConnected) {
+  if (!isConnected && process.env.MONGODB_URI) {
     try {
-      await connectDB();
+      const mongoose = require('mongoose');
+      mongooseConnection = await mongoose.connect(process.env.MONGODB_URI);
       isConnected = true;
-      console.log('✅ Database connected successfully');
+      console.log('✅ MongoDB connected successfully');
+      console.log(`📦 Database: ${mongooseConnection.connection.name}`);
     } catch (error) {
       console.error('❌ Database connection failed:', error);
       throw error;
