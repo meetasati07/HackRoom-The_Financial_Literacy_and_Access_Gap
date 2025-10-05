@@ -1,6 +1,7 @@
 [build]
-  publish = "frontend/build"
-  command = "cd frontend && npm ci && npm run build"
+  base = "frontend"
+  publish = "build"
+  command = "npm ci && npm run build"
 
 # Deploy from master branch
 [context.production]
@@ -11,7 +12,7 @@
 
 # Serverless functions configuration
 [functions]
-  directory = "netlify/functions"
+  directory = "../netlify/functions"
   node_bundler = "esbuild"
 
 # Redirects for API and SPA routing
