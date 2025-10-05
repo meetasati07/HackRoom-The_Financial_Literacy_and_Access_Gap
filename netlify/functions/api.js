@@ -409,10 +409,10 @@ authRoutes.post('/login', async (req, res) => {
   }
 });
 
-// User routes - Register with actual Netlify paths
-userRoutes.get('/profile', async (req, res) => {
+// User dashboard - Personalized user data
+userRoutes.get('/dashboard', async (req, res) => {
   try {
-    console.log('👤 Profile request');
+    console.log('📊 User dashboard request');
 
     // Check for authorization header
     const authHeader = req.headers.authorization;
@@ -428,7 +428,7 @@ userRoutes.get('/profile', async (req, res) => {
 
     try {
       const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret');
-      console.log('✅ Token verified for user:', decoded.mobile);
+      console.log('✅ Token verified for user dashboard:', decoded.mobile);
 
       if (!process.env.MONGODB_URI) {
         return res.status(500).json({
@@ -440,7 +440,13 @@ userRoutes.get('/profile', async (req, res) => {
       const mongoose = require('mongoose');
       const User = mongoose.models.User || mongoose.model('User', new mongoose.Schema({
         name: String, mobile: String, email: String, password: String,
-        coins: Number, level: String, completedQuiz: Boolean, refreshTokens: [String]
+        coins: Number, level: String, completedQuiz: Boolean, refreshTokens: [String],
+        totalEarnings: { type: Number, default: 0 },
+        investmentPortfolio: { type: Number, default: 0 },
+        riskTolerance: { type: String, default: 'Medium' },
+        financialGoals: [{ type: String }],
+        lastActive: { type: Date, default: Date.now },
+        streakDays: { type: Number, default: 0 }
       }, { timestamps: true }));
 
       const user = await User.findById(decoded.userId);
@@ -450,6 +456,26 @@ userRoutes.get('/profile', async (req, res) => {
           message: 'User not found'
         });
       }
+
+      // Update last active
+      user.lastActive = new Date();
+      await user.save();
+
+      // Calculate user-specific insights
+      const userInsights = {
+        level: user.level,
+        coins: user.coins,
+        completedQuiz: user.completedQuiz,
+        totalEarnings: user.totalEarnings || 0,
+        investmentPortfolio: user.investmentPortfolio || 0,
+        riskTolerance: user.riskTolerance || 'Medium',
+        financialGoals: user.financialGoals || [],
+        streakDays: user.streakDays || 0,
+        daysSinceJoined: Math.floor((Date.now() - user.createdAt) / (1000 * 60 * 60 * 24)),
+        weeklyProgress: await calculateWeeklyProgress(user._id),
+        achievements: await getUserAchievements(user),
+        personalizedTips: getPersonalizedTips(user)
+      };
 
       res.json({
         success: true,
@@ -462,7 +488,9 @@ userRoutes.get('/profile', async (req, res) => {
             coins: user.coins,
             level: user.level,
             completedQuiz: user.completedQuiz,
-          }
+          },
+          dashboard: userInsights,
+          timestamp: new Date().toISOString()
         }
       });
 
@@ -475,10 +503,110 @@ userRoutes.get('/profile', async (req, res) => {
     }
 
   } catch (error) {
-    console.error('Profile error:', error);
+    console.error('User dashboard error:', error);
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
+
+// Helper function to calculate weekly progress
+async function calculateWeeklyProgress(userId) {
+  try {
+    const mongoose = require('mongoose');
+    const User = mongoose.models.User;
+
+    // Get user's activity over the past week
+    const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+    // This would typically query activity logs, but for now return mock data
+    return {
+      coinsEarned: 150,
+      quizzesCompleted: 2,
+      lessonsWatched: 5,
+      goalsAchieved: 1,
+      consistency: 85 // percentage
+    };
+  } catch (error) {
+    console.error('Weekly progress calculation error:', error);
+    return {
+      coinsEarned: 0,
+      quizzesCompleted: 0,
+      lessonsWatched: 0,
+      goalsAchieved: 0,
+      consistency: 0
+    };
+  }
+}
+
+// Helper function to get user achievements
+async function getUserAchievements(user) {
+  const achievements = [];
+
+  if (user.completedQuiz) {
+    achievements.push({
+      id: 'first_quiz',
+      title: 'Quiz Master',
+      description: 'Completed your first financial literacy quiz',
+      icon: '🎯',
+      earnedAt: user.updatedAt
+    });
+  }
+
+  if (user.coins >= 100) {
+    achievements.push({
+      id: 'coin_collector',
+      title: 'Coin Collector',
+      description: 'Earned 100 coins through learning',
+      icon: '🪙',
+      earnedAt: new Date()
+    });
+  }
+
+  if (user.streakDays >= 7) {
+    achievements.push({
+      id: 'streak_master',
+      title: 'Consistency King',
+      description: 'Maintained a 7-day learning streak',
+      icon: '🔥',
+      earnedAt: new Date()
+    });
+  }
+
+  return achievements;
+}
+
+// Helper function to get personalized tips
+function getPersonalizedTips(user) {
+  const tips = [];
+
+  if (!user.completedQuiz) {
+    tips.push({
+      type: 'action',
+      title: 'Complete Your First Quiz',
+      message: 'Start your financial literacy journey by taking the beginner quiz!',
+      priority: 'high'
+    });
+  }
+
+  if (user.coins < 50) {
+    tips.push({
+      type: 'learning',
+      title: 'Earn More Coins',
+      message: 'Complete lessons and quizzes to earn coins for your virtual portfolio',
+      priority: 'medium'
+    });
+  }
+
+  if (user.riskTolerance === 'Low' && user.investmentPortfolio < 1000) {
+    tips.push({
+      type: 'investment',
+      title: 'Conservative Investing',
+      message: 'Your low-risk profile suggests focusing on stable, long-term investments',
+      priority: 'low'
+    });
+  }
+
+  return tips;
+}
 
 // Auth routes - Get current user
 authRoutes.get('/me', async (req, res) => {
@@ -672,12 +800,356 @@ statsRoutes.get('/platform', async (req, res) => {
   }
 });
 
+// User routes - Update user preferences and goals
+userRoutes.post('/update-profile', async (req, res) => {
+  try {
+    console.log('🔄 Update profile request');
+
+    // Check for authorization header
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authorization token required'
+      });
+    }
+
+    const token = authHeader.substring(7);
+    const jwt = require('jsonwebtoken');
+
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret');
+
+      if (!process.env.MONGODB_URI) {
+        return res.status(500).json({
+          success: false,
+          message: 'Database not configured'
+        });
+      }
+
+      const mongoose = require('mongoose');
+      const User = mongoose.models.User || mongoose.model('User', new mongoose.Schema({
+        name: String, mobile: String, email: String, password: String,
+        coins: Number, level: String, completedQuiz: Boolean, refreshTokens: [String],
+        totalEarnings: { type: Number, default: 0 },
+        investmentPortfolio: { type: Number, default: 0 },
+        riskTolerance: { type: String, default: 'Medium' },
+        financialGoals: [{ type: String }],
+        lastActive: { type: Date, default: Date.now },
+        streakDays: { type: Number, default: 0 }
+      }, { timestamps: true }));
+
+      const user = await User.findById(decoded.userId);
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: 'User not found'
+        });
+      }
+
+      // Handle serverless function body parsing
+      let body = req.body;
+      if (body && Array.isArray(body)) {
+        const jsonString = String.fromCharCode(...body);
+        body = JSON.parse(jsonString);
+      } else if (body && typeof body === 'object' && !Array.isArray(body) && Object.keys(body).every(key => !isNaN(key))) {
+        const values = Object.keys(body).sort((a, b) => parseInt(a) - parseInt(b)).map(key => body[key]);
+        const jsonString = String.fromCharCode(...values);
+        body = JSON.parse(jsonString);
+      }
+
+      // Update user fields based on input
+      const updates = {};
+
+      if (body.riskTolerance) {
+        updates.riskTolerance = body.riskTolerance;
+        console.log('📊 Updated risk tolerance:', body.riskTolerance);
+      }
+
+      if (body.financialGoals && Array.isArray(body.financialGoals)) {
+        updates.financialGoals = body.financialGoals;
+        console.log('🎯 Updated financial goals:', body.financialGoals.length, 'goals');
+      }
+
+      if (body.investmentPortfolio !== undefined) {
+        updates.investmentPortfolio = body.investmentPortfolio;
+        console.log('💼 Updated investment portfolio:', body.investmentPortfolio);
+      }
+
+      // Apply updates
+      Object.keys(updates).forEach(key => {
+        user[key] = updates[key];
+      });
+
+      // Update streak if user was active today
+      const today = new Date().toDateString();
+      const lastActiveDate = user.lastActive ? user.lastActive.toDateString() : null;
+
+      if (lastActiveDate !== today) {
+        user.streakDays = (user.streakDays || 0) + 1;
+        console.log('🔥 Updated streak to:', user.streakDays);
+      }
+
+      user.lastActive = new Date();
+      await user.save();
+
+      res.json({
+        success: true,
+        message: 'Profile updated successfully',
+        data: {
+          user: {
+            id: user._id,
+            name: user.name,
+            coins: user.coins,
+            level: user.level,
+            riskTolerance: user.riskTolerance,
+            financialGoals: user.financialGoals,
+            investmentPortfolio: user.investmentPortfolio,
+            streakDays: user.streakDays,
+          }
+        }
+      });
+
+    } catch (tokenError) {
+      console.error('Token verification failed:', tokenError);
+      res.status(401).json({
+        success: false,
+        message: 'Invalid or expired token'
+      });
+    }
+
+  } catch (error) {
+    console.error('Update profile error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// User routes - Record learning activity
+userRoutes.post('/record-activity', async (req, res) => {
+  try {
+    console.log('📚 Record activity request');
+
+    // Check for authorization header
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authorization token required'
+      });
+    }
+
+    const token = authHeader.substring(7);
+    const jwt = require('jsonwebtoken');
+
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret');
+
+      if (!process.env.MONGODB_URI) {
+        return res.status(500).json({
+          success: false,
+          message: 'Database not configured'
+        });
+      }
+
+      const mongoose = require('mongoose');
+      const User = mongoose.models.User || mongoose.model('User', new mongoose.Schema({
+        name: String, mobile: String, email: String, password: String,
+        coins: Number, level: String, completedQuiz: Boolean, refreshTokens: [String],
+        totalEarnings: { type: Number, default: 0 },
+        investmentPortfolio: { type: Number, default: 0 },
+        riskTolerance: { type: String, default: 'Medium' },
+        financialGoals: [{ type: String }],
+        lastActive: { type: Date, default: Date.now },
+        streakDays: { type: Number, default: 0 }
+      }, { timestamps: true }));
+
+      const user = await User.findById(decoded.userId);
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: 'User not found'
+        });
+      }
+
+      // Handle serverless function body parsing
+      let body = req.body;
+      if (body && Array.isArray(body)) {
+        const jsonString = String.fromCharCode(...body);
+        body = JSON.parse(jsonString);
+      } else if (body && typeof body === 'object' && !Array.isArray(body) && Object.keys(body).every(key => !isNaN(key))) {
+        const values = Object.keys(body).sort((a, b) => parseInt(a) - parseInt(b)).map(key => body[key]);
+        const jsonString = String.fromCharCode(...values);
+        body = JSON.parse(jsonString);
+      }
+
+      const { activityType, coinsEarned = 10, metadata } = body;
+
+      if (!activityType) {
+        return res.status(400).json({
+          success: false,
+          message: 'Activity type is required'
+        });
+      }
+
+      // Award coins based on activity type
+      let coinsToAdd = coinsEarned;
+      let activityDescription = '';
+
+      switch (activityType) {
+        case 'lesson_completed':
+          coinsToAdd = 25;
+          activityDescription = 'Completed a financial lesson';
+          break;
+        case 'quiz_completed':
+          coinsToAdd = 50;
+          activityDescription = 'Completed a quiz';
+          break;
+        case 'goal_achieved':
+          coinsToAdd = 100;
+          activityDescription = 'Achieved a financial goal';
+          break;
+        case 'daily_login':
+          coinsToAdd = 5;
+          activityDescription = 'Daily login bonus';
+          break;
+        default:
+          activityDescription = 'Learning activity completed';
+      }
+
+      // Update user stats
+      user.coins = (user.coins || 0) + coinsToAdd;
+      user.totalEarnings = (user.totalEarnings || 0) + coinsToAdd;
+      user.lastActive = new Date();
+
+      // Update streak
+      const today = new Date().toDateString();
+      const lastActiveDate = user.lastActive ? new Date(user.lastActive).toDateString() : null;
+
+      if (lastActiveDate !== today) {
+        user.streakDays = (user.streakDays || 0) + 1;
+      }
+
+      await user.save();
+
+      console.log(`✅ Activity recorded: ${activityType}, coins: +${coinsToAdd}`);
+
+      res.json({
+        success: true,
+        message: `${activityDescription} - Earned ${coinsToAdd} coins!`,
+        data: {
+          user: {
+            id: user._id,
+            coins: user.coins,
+            totalEarnings: user.totalEarnings,
+            streakDays: user.streakDays,
+          },
+          activity: {
+            type: activityType,
+            coinsEarned: coinsToAdd,
+            description: activityDescription,
+            timestamp: new Date().toISOString()
+          }
+        }
+      });
+
+    } catch (tokenError) {
+      console.error('Token verification failed:', tokenError);
+      res.status(401).json({
+        success: false,
+        message: 'Invalid or expired token'
+      });
+    }
+
+  } catch (error) {
+    console.error('Record activity error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Real-time platform statistics with live updates
+statsRoutes.get('/live', async (req, res) => {
+  try {
+    console.log('📈 Live platform stats request');
+
+    if (!process.env.MONGODB_URI) {
+      return res.status(500).json({
+        success: false,
+        message: 'Database not configured'
+      });
+    }
+
+    const mongoose = require('mongoose');
+    const User = mongoose.models.User || mongoose.model('User', new mongoose.Schema({
+      name: String, mobile: String, email: String, password: String,
+      coins: Number, level: String, completedQuiz: Boolean, refreshTokens: [String],
+      totalEarnings: Number, investmentPortfolio: Number, riskTolerance: String,
+      financialGoals: [String], lastActive: Date, streakDays: Number
+    }, { timestamps: true }));
+
+    // Get real-time statistics
+    const totalUsers = await User.countDocuments();
+    const activeUsersToday = await User.countDocuments({
+      lastActive: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) }
+    });
+    const quizCompletedUsers = await User.countDocuments({ completedQuiz: true });
+
+    const totalCoinsDistributed = await User.aggregate([
+      { $group: { _id: null, total: { $sum: '$coins' } } }
+    ]);
+
+    const avgCoinsPerUser = totalUsers > 0 ? (totalCoinsDistributed[0]?.total || 0) / totalUsers : 0;
+
+    // Get top performers
+    const topUsers = await User.find({})
+      .sort({ coins: -1 })
+      .limit(5)
+      .select('name coins level completedQuiz');
+
+    // Get recent activity (users who were active in last hour)
+    const recentActivity = await User.countDocuments({
+      lastActive: { $gte: new Date(Date.now() - 60 * 60 * 1000) }
+    });
+
+    res.json({
+      success: true,
+      data: {
+        stats: {
+          totalUsers,
+          activeUsersToday,
+          quizCompletedUsers,
+          totalCoinsDistributed: totalCoinsDistributed[0]?.total || 0,
+          avgCoinsPerUser: Math.round(avgCoinsPerUser),
+          completionRate: totalUsers > 0 ? (quizCompletedUsers / totalUsers * 100).toFixed(1) : 0,
+          recentActivity,
+          topPerformers: topUsers.map(user => ({
+            name: user.name,
+            coins: user.coins,
+            level: user.level,
+            completedQuiz: user.completedQuiz
+          })),
+          lastUpdated: new Date().toISOString(),
+          serverTime: new Date().toISOString()
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Live stats error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 // Register stats routes
 app.use('/.netlify/functions/api/stats', statsRoutes);
 
-// API routes - Register with multiple path patterns
+// API routes - Use full paths for Netlify serverless functions
 app.use('/.netlify/functions/api/auth', authRoutes);
-app.use('/.netlify/functions/api', authRoutes); // For direct access to auth routes
+app.use('/.netlify/functions/api/users', userRoutes);
+app.use('/.netlify/functions/api/financial', financialRoutes);
+app.use('/.netlify/functions/api/transactions', transactionRoutes);
+
+// Also register auth routes at the root level for direct access
+app.use('/.netlify/functions/api', authRoutes);
 
 // Health check endpoint - Register with actual path Netlify sends
 app.get('/.netlify/functions/api/health', (req, res) => {
@@ -703,15 +1175,6 @@ app.get('/health', (req, res) => {
     note: 'Short path access'
   });
 });
-
-// API routes - Use full paths for Netlify serverless functions
-app.use('/.netlify/functions/api/auth', authRoutes);
-app.use('/.netlify/functions/api/users', userRoutes);
-app.use('/.netlify/functions/api/financial', financialRoutes);
-app.use('/.netlify/functions/api/transactions', transactionRoutes);
-
-// Also register auth routes at the root level for direct access
-app.use('/.netlify/functions/api', authRoutes);
 
 // Error handling middleware
 app.use((req, res) => {
