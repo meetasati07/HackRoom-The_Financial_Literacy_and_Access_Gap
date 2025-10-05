@@ -4,9 +4,11 @@ const helmet = require('helmet');
 const compression = require('compression');
 const cookieParser = require('cookie-parser');
 const serverless = require('serverless-http');
+const connectDB = require('./db'); // <-- add this
 
-// Simple API routes that work without backend compilation
-const authRoutes = require('express').Router();
+// Create Express app instance
+const app = express();
+const authRoutes = require('express').Router(); // <-- added
 const userRoutes = require('express').Router();
 const financialRoutes = require('express').Router();
 const transactionRoutes = require('express').Router();
@@ -73,27 +75,16 @@ userRoutes.get('/profile', async (req, res) => {
 });
 
 // API routes - Use full paths for Netlify serverless functions
-app.use('/.netlify/functions/api/auth', authRoutes);
-app.use('/.netlify/functions/api/users', userRoutes);
-app.use('/.netlify/functions/api/financial', financialRoutes);
-app.use('/.netlify/functions/api/transactions', transactionRoutes);
-
-// Create Express app
-const app = express();
+// (These will be registered after Express app is created)
 
 // Add logging middleware first
 app.use((req, res, next) => {
   console.log(`🚀 Request received: ${req.method} ${req.originalUrl}`);
   console.log(`📍 Path: ${req.path}`);
   console.log(`🔍 Base URL: ${req.baseUrl}`);
+  console.log(`🔎 Request headers: ${JSON.stringify(req.headers)}`);
   next();
 });
-
-// Security middleware
-app.use(helmet({
-  contentSecurityPolicy: false, // Disable CSP for Netlify compatibility
-}));
-app.use(compression());
 
 // CORS configuration for production
 app.use(cors({
@@ -107,12 +98,12 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
+
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
 
-// Health check endpoint - Register with actual path Netlify sends
 app.get('/.netlify/functions/api/health', (req, res) => {
   console.log('✅ Health check accessed');
   res.status(200).json({
