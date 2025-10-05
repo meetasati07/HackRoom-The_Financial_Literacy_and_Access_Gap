@@ -65,6 +65,14 @@ try {
 // Create Express app
 const app = express();
 
+// Add logging middleware first
+app.use((req, res, next) => {
+  console.log(`🚀 Request received: ${req.method} ${req.originalUrl}`);
+  console.log(`📍 Path: ${req.path}`);
+  console.log(`🔍 Base URL: ${req.baseUrl}`);
+  next();
+});
+
 // Security middleware
 app.use(helmet({
   contentSecurityPolicy: false, // Disable CSP for Netlify compatibility
@@ -89,7 +97,7 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
 
-// Health check endpoint - Direct route registration
+// Health check endpoint - Multiple ways to register
 app.get('/health', (req, res) => {
   console.log('✅ Health check accessed');
   res.status(200).json({
@@ -97,6 +105,21 @@ app.get('/health', (req, res) => {
     message: 'HackWave API is running on Netlify',
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'production',
+    path: req.path,
+    baseUrl: req.baseUrl,
+    originalUrl: req.originalUrl
+  });
+});
+
+// Also register without leading slash (Netlify might strip it)
+app.get('health', (req, res) => {
+  console.log('✅ Health check accessed (no leading slash)');
+  res.status(200).json({
+    status: 'OK',
+    message: 'HackWave API is running on Netlify',
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'production',
+    note: 'Accessed without leading slash'
   });
 });
 
